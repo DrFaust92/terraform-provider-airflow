@@ -2,10 +2,14 @@ package main
 
 import (
 	"fmt"
+	"sync"
 
 	"github.com/apache/airflow-client-go/airflow"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 )
+
+var airflowUsers = map[string]airflow.UserCollectionItem{}
+var airflowUsersFetch sync.Mutex
 
 func resourceUser() *schema.Resource {
 	return &schema.Resource{
@@ -86,22 +90,56 @@ func resourceUserCreate(d *schema.ResourceData, m interface{}) error {
 	if err != nil {
 		return fmt.Errorf("failed to create user `%s` from Airflow: %w", email, err)
 	}
-	d.SetId(username)
+	d.SetId(email)
 
 	return resourceUserRead(d, m)
 }
 
-func resourceUserRead(d *schema.ResourceData, m interface{}) error {
+func fetchAllUsers(users map[string]airflow.UserCollectionItem, offset int32, m interface{}) error {
 	pcfg := m.(ProviderConfig)
 	client := pcfg.ApiClient
+	// This is the Airflow API default maximum page size.
+	limit := int32(100)
 
-	user, resp, err := client.UserApi.GetUser(pcfg.AuthContext, d.Id()).Execute()
-	if resp != nil && resp.StatusCode == 404 {
+	usersInResponse, resp, err := client.UserApi.GetUsers(pcfg.AuthContext).Limit(limit).Offset(offset).Execute()
+	if resp != nil && err == nil {
+		for _, u := range usersInResponse.GetUsers() {
+			users[*u.Email] = u
+		}
+	}
+
+	if err != nil {
+		return err
+	}
+
+	// Recurse to the next page in case there are more users to fetch.
+	if *usersInResponse.TotalEntries > int32(len(users)) {
+		return fetchAllUsers(users, offset+limit, m)
+	}
+
+	return nil
+}
+
+func resourceUserRead(d *schema.ResourceData, m interface{}) error {
+	// Use a lock to prevent concurrent map access.
+	airflowUsersFetch.Lock()
+
+	// Fetching all users is only needed once, so make sure to check this.
+	// There will always be >= 1 user; the users that we're using to
+	// make API calls.
+	if len(airflowUsers) == 0 {
+		err := fetchAllUsers(airflowUsers, 0, m)
+		if err != nil {
+			return fmt.Errorf("failed get all users from Airflow: %w", err)
+		}
+	}
+
+	user, exists := airflowUsers[d.Id()]
+	airflowUsersFetch.Unlock()
+
+	if !exists {
 		d.SetId("")
 		return nil
-	}
-	if err != nil {
-		return fmt.Errorf("failed to get user `%s` from Airflow: %w", d.Id(), err)
 	}
 
 	d.Set("active", user.GetActive())
@@ -121,12 +159,12 @@ func resourceUserUpdate(d *schema.ResourceData, m interface{}) error {
 	pcfg := m.(ProviderConfig)
 	client := pcfg.ApiClient
 
-	email := d.Get("email").(string)
+	email := d.Id()
 	firstName := d.Get("first_name").(string)
 	lastName := d.Get("last_name").(string)
 	password := d.Get("password").(string)
 	roles := expandAirflowUserRoles(d.Get("roles").(*schema.Set))
-	username := d.Id()
+	username := d.Get("username").(string)
 
 	_, _, err := client.UserApi.PatchUser(pcfg.AuthContext, username).User(airflow.User{
 		Email:     &email,
