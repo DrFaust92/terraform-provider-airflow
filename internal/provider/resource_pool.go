@@ -27,7 +27,7 @@ func resourcePool() *schema.Resource {
 				Type:     schema.TypeInt,
 				Required: true,
 			},
-			"include_defered": {
+			"include_deferred": {
 				Type:     schema.Bool,
 				Optional: true,
 			},
@@ -57,13 +57,13 @@ func resourcePoolCreate(ctx context.Context, d *schema.ResourceData, m interface
 
 	name := d.Get("name").(string)
 	slots := int32(d.Get("slots").(int))
-	includeDefered := d.Get("include_defered").(bool)
+	includeDeferred := d.Get("include_deferred").(bool)
 	varApi := client.PoolApi
 
 	pool := airflow.Pool{
 		Name:  &name,
 		Slots: &slots,
-		IncludeDeferred: &includeDefered,
+		IncludeDeferred: &includeDeferred,
 	}
 
 	_, _, err := varApi.PostPool(pcfg.AuthContext).Pool(pool).Execute()
@@ -94,6 +94,7 @@ func resourcePoolRead(ctx context.Context, d *schema.ResourceData, m interface{}
 	d.Set("queued_slots", pool.QueuedSlots)
 	d.Set("open_slots", pool.OpenSlots)
 	d.Set("used_slots", pool.UsedSlots)
+	d.Set("include_deferred", pool.IncludeDeferred)
 
 	return nil
 }
@@ -104,12 +105,12 @@ func resourcePoolUpdate(ctx context.Context, d *schema.ResourceData, m interface
 
 	slots := int32(d.Get("slots").(int))
 	name := d.Id()
-	includeDefered := d.Get("include_defered").(bool)
+	includeDeferred := d.Get("include_deferred").(bool)
 
 	pool := airflow.Pool{
 		Name:  &name,
 		Slots: &slots,
-		IncludeDeferred: &includeDefered,
+		IncludeDeferred: &includeDeferred,
 	}
 
 	_, _, err := client.PoolApi.PatchPool(pcfg.AuthContext, name).Pool(pool).Execute()
