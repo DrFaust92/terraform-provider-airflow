@@ -19,11 +19,12 @@ func TestAccAirflowPool_basic(t *testing.T) {
 		CheckDestroy: testAccCheckAirflowPoolCheckDestroy,
 		Steps: []resource.TestStep{
 			{
-				Config: testAccAirflowPoolConfigBasic(rName, 2),
+				Config: testAccAirflowPoolConfigBasic(rName, 2, true),
 				Check: resource.ComposeTestCheckFunc(
 					resource.TestCheckResourceAttr(resourceName, "name", rName),
 					resource.TestCheckResourceAttr(resourceName, "slots", "2"),
 					resource.TestCheckResourceAttr(resourceName, "open_slots", "2"),
+					resource.TestCheckResourceAttr(resourceName, "include_defered", "true"),
 				),
 			},
 			{
@@ -32,11 +33,12 @@ func TestAccAirflowPool_basic(t *testing.T) {
 				ImportStateVerify: true,
 			},
 			{
-				Config: testAccAirflowPoolConfigBasic(rName, 3),
+				Config: testAccAirflowPoolConfigBasic(rName, 3, false),
 				Check: resource.ComposeTestCheckFunc(
 					resource.TestCheckResourceAttr(resourceName, "name", rName),
 					resource.TestCheckResourceAttr(resourceName, "slots", "3"),
 					resource.TestCheckResourceAttr(resourceName, "open_slots", "3"),
+					resource.TestCheckResourceAttr(resourceName, "include_defered", "false"),
 				),
 			},
 		},
@@ -66,11 +68,13 @@ func testAccCheckAirflowPoolCheckDestroy(s *terraform.State) error {
 	return nil
 }
 
-func testAccAirflowPoolConfigBasic(rName string, slots int) string {
+func testAccAirflowPoolConfigBasic(rName string, slots int, includeDefered bool) string {
 	return fmt.Sprintf(`
 resource "airflow_pool" "test" {
-  name   = %[1]q
-  slots  = %[2]d
+  name           = %[1]q
+  slots          = %[2]d
+  include_defered = %[3]t
 }
-`, rName, slots)
+`, rName, slots, includeDefered)
 }
+
