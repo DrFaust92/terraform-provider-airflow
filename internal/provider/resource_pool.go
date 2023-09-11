@@ -28,7 +28,7 @@ func resourcePool() *schema.Resource {
 				Required: true,
 			},
 			"include_deferred": {
-				Type:     schema.Bool,
+				Type:     schema.TypeBool,
 				Optional: true,
 			},
 			"occupied_slots": {
