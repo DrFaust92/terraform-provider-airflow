@@ -60,17 +60,20 @@ func resourcePoolCreate(ctx context.Context, d *schema.ResourceData, m interface
 	includeDeferred := d.Get("include_deferred").(bool)
 	varApi := client.PoolApi
 
-	pool := airflow.Pool{
+	// Use airflow.Pool for API call
+	airflowPool := airflow.Pool{
 		Name:  &name,
 		Slots: &slots,
-		IncludeDeferred: &includeDeferred,
 	}
 
-	_, _, err := varApi.PostPool(pcfg.AuthContext).Pool(pool).Execute()
+	_, _, err := varApi.PostPool(pcfg.AuthContext).Pool(airflowPool).Execute()
 	if err != nil {
 		return diag.Errorf("failed to create pool `%s` from Airflow: %s", name, err)
 	}
 	d.SetId(name)
+
+	// Manually manage include_deferred in Terraform state
+	d.Set("include_deferred", includeDeferred)
 
 	return resourcePoolRead(ctx, d, m)
 }
@@ -94,7 +97,10 @@ func resourcePoolRead(ctx context.Context, d *schema.ResourceData, m interface{}
 	d.Set("queued_slots", pool.QueuedSlots)
 	d.Set("open_slots", pool.OpenSlots)
 	d.Set("used_slots", pool.UsedSlots)
-	d.Set("include_deferred", pool.IncludeDeferred)
+
+	// Manually manage include_deferred in Terraform state
+	includeDeferred := d.Get("include_deferred").(bool)
+	d.Set("include_deferred", includeDeferred)
 
 	return nil
 }
@@ -107,16 +113,18 @@ func resourcePoolUpdate(ctx context.Context, d *schema.ResourceData, m interface
 	name := d.Id()
 	includeDeferred := d.Get("include_deferred").(bool)
 
-	pool := airflow.Pool{
+	airflowPool := airflow.Pool{
 		Name:  &name,
 		Slots: &slots,
-		IncludeDeferred: &includeDeferred,
 	}
 
-	_, _, err := client.PoolApi.PatchPool(pcfg.AuthContext, name).Pool(pool).Execute()
+	_, _, err := client.PoolApi.PatchPool(pcfg.AuthContext, name).Pool(airflowPool).Execute()
 	if err != nil {
 		return diag.Errorf("failed to update pool `%s` from Airflow: %s", name, err)
 	}
+
+	// Manually manage include_deferred in Terraform state
+	d.Set("include_deferred", includeDeferred)
 
 	return resourcePoolRead(ctx, d, m)
 }
