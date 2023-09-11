@@ -24,7 +24,7 @@ func TestAccAirflowPool_basic(t *testing.T) {
 					resource.TestCheckResourceAttr(resourceName, "name", rName),
 					resource.TestCheckResourceAttr(resourceName, "slots", "2"),
 					resource.TestCheckResourceAttr(resourceName, "open_slots", "2"),
-					resource.TestCheckResourceAttr(resourceName, "include_defered", "true"),
+					resource.TestCheckResourceAttr(resourceName, "include_deferred", "true"),
 				),
 			},
 			{
@@ -38,7 +38,7 @@ func TestAccAirflowPool_basic(t *testing.T) {
 					resource.TestCheckResourceAttr(resourceName, "name", rName),
 					resource.TestCheckResourceAttr(resourceName, "slots", "3"),
 					resource.TestCheckResourceAttr(resourceName, "open_slots", "3"),
-					resource.TestCheckResourceAttr(resourceName, "include_defered", "false"),
+					resource.TestCheckResourceAttr(resourceName, "include_deferred", "false"),
 				),
 			},
 		},
@@ -68,13 +68,13 @@ func testAccCheckAirflowPoolCheckDestroy(s *terraform.State) error {
 	return nil
 }
 
-func testAccAirflowPoolConfigBasic(rName string, slots int, includeDefered bool) string {
+func testAccAirflowPoolConfigBasic(rName string, slots int, includeDeferred bool) string {
 	return fmt.Sprintf(`
 resource "airflow_pool" "test" {
   name           = %[1]q
   slots          = %[2]d
-  include_defered = %[3]t
+  include_deferred = %[3]t
 }
-`, rName, slots, includeDefered)
+`, rName, slots, includeDeferred)
 }
 
