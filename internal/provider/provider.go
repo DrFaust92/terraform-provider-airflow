@@ -70,6 +70,7 @@ func AirflowProvider() *schema.Provider {
 			"airflow_pool":       resourcePool(),
 			"airflow_role":       resourceRole(),
 			"airflow_user":       resourceUser(),
+			"airflow_user_roles": resourceUserRoles(),
 		},
 		// ConfigureContextFunc: providerConfigure,
 	}
