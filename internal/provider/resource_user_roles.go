@@ -104,7 +104,8 @@ func resourceUserRolesDelete(ctx context.Context, d *schema.ResourceData, m inte
 	roles := make([]airflow.UserCollectionItemRoles, 0)
 	username := d.Id()
 
-	_, _, err := client.UserApi.PatchUser(pcfg.AuthContext, username).UpdateMask([]string{"roles"}).User(airflow.User{
+	var err error
+	_, _, _ = client.UserApi.PatchUser(pcfg.AuthContext, username).UpdateMask([]string{"roles"}).User(airflow.User{
 		Roles:     &roles,
 		Username:  &username,
 		FirstName: &username,

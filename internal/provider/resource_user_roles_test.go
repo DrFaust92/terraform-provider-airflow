@@ -75,7 +75,7 @@ func testAccCheckAirflowUserRolesCheckDestroy(s *terraform.State) error {
 			continue
 		}
 	}
-	client.ApiClient.UserApi.DeleteUser(client.AuthContext, accName).Execute()
+	_, _ = client.ApiClient.UserApi.DeleteUser(client.AuthContext, accName).Execute()
 
 	return nil
 }

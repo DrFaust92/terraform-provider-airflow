@@ -143,19 +143,39 @@ func resourceConnectionRead(ctx context.Context, d *schema.ResourceData, m inter
 		return diag.Errorf("failed to get connection `%s` from Airflow: %s", d.Id(), err)
 	}
 
-	d.Set("connection_id", connection.GetConnectionId())
-	d.Set("conn_type", connection.GetConnType())
-	d.Set("host", connection.GetHost())
-	d.Set("login", connection.GetLogin())
-	d.Set("schema", connection.GetSchema())
-	d.Set("port", connection.GetPort())
-	d.Set("extra", connection.GetExtra())
-	d.Set("description", connection.GetDescription())
+	if err := d.Set("connection_id", connection.GetConnectionId()); err != nil {
+		return diag.FromErr(err)
+	}
+	if err := d.Set("conn_type", connection.GetConnType()); err != nil {
+		return diag.FromErr(err)
+	}
+	if err := d.Set("host", connection.GetHost()); err != nil {
+		return diag.FromErr(err)
+	}
+	if err := d.Set("login", connection.GetLogin()); err != nil {
+		return diag.FromErr(err)
+	}
+	if err := d.Set("schema", connection.GetSchema()); err != nil {
+		return diag.FromErr(err)
+	}
+	if err := d.Set("port", connection.GetPort()); err != nil {
+		return diag.FromErr(err)
+	}
+	if err := d.Set("extra", connection.GetExtra()); err != nil {
+		return diag.FromErr(err)
+	}
+	if err := d.Set("description", connection.GetDescription()); err != nil {
+		return diag.FromErr(err)
+	}
 
 	if v, ok := connection.GetPasswordOk(); ok {
-		d.Set("password", v)
+		if err := d.Set("password", v); err != nil {
+			return diag.FromErr(err)
+		}
 	} else if v, ok := d.GetOk("password"); ok {
-		d.Set("password", v)
+		if err := d.Set("password", v); err != nil {
+			return diag.FromErr(err)
+		}
 	}
 
 	return nil

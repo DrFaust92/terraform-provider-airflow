@@ -91,13 +91,27 @@ func resourceDagRead(ctx context.Context, d *schema.ResourceData, m interface{})
 		return diag.Errorf("failed to get DAG `%s` from Airflow: %s", d.Id(), err)
 	}
 
-	d.Set("dag_id", DAG.DagId)
-	d.Set("is_paused", DAG.IsPaused.Get())
-	d.Set("is_active", DAG.IsActive.Get())
-	d.Set("is_subdag", DAG.IsSubdag)
-	d.Set("description", DAG.Description.Get())
-	d.Set("file_token", DAG.FileToken)
-	d.Set("fileloc", DAG.Fileloc)
+	if err := d.Set("dag_id", DAG.DagId); err != nil {
+		return diag.FromErr(err)
+	}
+	if err := d.Set("is_paused", DAG.IsPaused.Get()); err != nil {
+		return diag.FromErr(err)
+	}
+	if err := d.Set("is_active", DAG.IsActive.Get()); err != nil {
+		return diag.FromErr(err)
+	}
+	if err := d.Set("is_subdag", DAG.IsSubdag); err != nil {
+		return diag.FromErr(err)
+	}
+	if err := d.Set("description", DAG.Description.Get()); err != nil {
+		return diag.FromErr(err)
+	}
+	if err := d.Set("file_token", DAG.FileToken); err != nil {
+		return diag.FromErr(err)
+	}
+	if err := d.Set("fileloc", DAG.Fileloc); err != nil {
+		return diag.FromErr(err)
+	}
 	d.Set("root_dag_id", DAG.RootDagId.Get())
 
 	return nil

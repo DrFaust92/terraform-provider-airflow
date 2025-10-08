@@ -82,7 +82,7 @@ func AirflowProvider() *schema.Provider {
 	return provider
 }
 
-func providerConfigure(ctx context.Context, d *schema.ResourceData) (interface{}, diag.Diagnostics) {
+func providerConfigure(_ context.Context, d *schema.ResourceData) (interface{}, diag.Diagnostics) {
 	var transport http.RoundTripper
 
 	if disableSSL := d.Get("disable_ssl_verification").(bool); disableSSL {
@@ -97,7 +97,7 @@ func providerConfigure(ctx context.Context, d *schema.ResourceData) (interface{}
 		Transport: transport,
 	}
 
-	ctx = context.Background()
+	ctx := context.Background()
 	endpoint := d.Get("base_endpoint").(string)
 	u, err := url.Parse(endpoint)
 	if err != nil {
