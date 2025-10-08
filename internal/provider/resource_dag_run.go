@@ -8,7 +8,7 @@ import (
 
 	"github.com/apache/airflow-client-go/airflow"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/retry"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 )
 
@@ -70,7 +70,7 @@ func resourceDagRunCreate(ctx context.Context, d *schema.ResourceData, m interfa
 	}
 	d.SetId(fmt.Sprintf("%s:%s", dagId, *res.DagRunId.Get()))
 
-	stateConf := &resource.StateChangeConf{
+	stateConf := &retry.StateChangeConf{
 		Pending: []string{"queued", "running", "success"},
 		Target:  []string{"success"},
 		Refresh: resourceDagRunStateRefreshFunc(d.Id(), pcfg.AuthContext, client),
@@ -103,10 +103,18 @@ func resourceDagRunRead(ctx context.Context, d *schema.ResourceData, m interface
 		return diag.Errorf("failed to get dagRunId `%s` from Airflow: %s", d.Id(), err)
 	}
 
-	d.Set("dag_id", dagRun.DagId)
-	d.Set("dag_run_id", dagRun.DagRunId.Get())
-	d.Set("conf", dagRun.Conf)
-	d.Set("state", dagRun.State)
+	if err := d.Set("dag_id", dagRun.DagId); err != nil {
+		return diag.FromErr(err)
+	}
+	if err := d.Set("dag_run_id", dagRun.DagRunId.Get()); err != nil {
+		return diag.FromErr(err)
+	}
+	if err := d.Set("conf", dagRun.Conf); err != nil {
+		return diag.FromErr(err)
+	}
+	if err := d.Set("state", dagRun.State); err != nil {
+		return diag.FromErr(err)
+	}
 
 	return nil
 }
@@ -142,7 +150,7 @@ func airflowDagRunId(id string) (string, string, error) {
 	return parts[0], parts[1], nil
 }
 
-func resourceDagRunStateRefreshFunc(id string, pcfg context.Context, client *airflow.DAGRunApiService) resource.StateRefreshFunc {
+func resourceDagRunStateRefreshFunc(id string, pcfg context.Context, client *airflow.DAGRunApiService) retry.StateRefreshFunc {
 	return func() (interface{}, string, error) {
 		dagId, dagRunId, err := airflowDagRunId(id)
 		if err != nil {

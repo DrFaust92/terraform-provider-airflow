@@ -22,6 +22,7 @@ resource "airflow_user_roles" "example" {
 ## Argument Reference
 
 The following arguments are supported:
+
 * `username` - (Required) The username
 * `roles` - (Required) A set of User roles to attach to the User.
 
