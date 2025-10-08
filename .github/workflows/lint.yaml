@@ -18,7 +18,4 @@ jobs:
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v8
         with:
-          go-version-file: "go.mod"
-          cache: true
-          version: v2.1
           only-new-issues: true
