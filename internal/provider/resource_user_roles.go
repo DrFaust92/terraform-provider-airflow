@@ -70,8 +70,12 @@ func resourceUserRolesRead(ctx context.Context, d *schema.ResourceData, m interf
 		return diag.Errorf("failed to get user `%s` from Airflow: %s", d.Id(), err)
 	}
 
-	d.Set("username", user.Username)
-	d.Set("roles", flattenAirflowUserRoles(*user.Roles))
+	if err := d.Set("username", user.Username); err != nil {
+		return diag.FromErr(err)
+	}
+	if err := d.Set("roles", flattenAirflowUserRoles(*user.Roles)); err != nil {
+		return diag.FromErr(err)
+	}
 
 	return nil
 }

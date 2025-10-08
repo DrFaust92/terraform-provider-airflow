@@ -75,9 +75,15 @@ func resourceVariableRead(ctx context.Context, d *schema.ResourceData, m interfa
 		return diag.Errorf("failed to get variable `%s`, Status: `%s` from Airflow: %s", d.Id(), resp.Status, err)
 	}
 
-	d.Set("key", variable.Key)
-	d.Set("value", variable.Value)
-	d.Set("description", variable.GetDescription())
+	if err := d.Set("key", variable.Key); err != nil {
+		return diag.FromErr(err)
+	}
+	if err := d.Set("value", variable.Value); err != nil {
+		return diag.FromErr(err)
+	}
+	if err := d.Set("description", variable.GetDescription()); err != nil {
+		return diag.FromErr(err)
+	}
 
 	return nil
 }

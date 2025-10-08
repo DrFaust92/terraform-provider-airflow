@@ -80,7 +80,9 @@ func resourceRoleRead(ctx context.Context, d *schema.ResourceData, m interface{}
 		return diag.Errorf("failed to get role `%s` from Airflow: %s", d.Id(), err)
 	}
 
-	d.Set("name", role.Name)
+	if err := d.Set("name", role.Name); err != nil {
+		return diag.FromErr(err)
+	}
 	if err := d.Set("action", flattenAirflowRoleActions(*role.Actions)); err != nil {
 		return diag.Errorf("error setting action: %s", err)
 	}

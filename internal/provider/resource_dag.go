@@ -112,7 +112,9 @@ func resourceDagRead(ctx context.Context, d *schema.ResourceData, m interface{})
 	if err := d.Set("fileloc", DAG.Fileloc); err != nil {
 		return diag.FromErr(err)
 	}
-	d.Set("root_dag_id", DAG.RootDagId.Get())
+	if err := d.Set("root_dag_id", DAG.RootDagId.Get()); err != nil {
+		return diag.FromErr(err)
+	}
 
 	return nil
 }

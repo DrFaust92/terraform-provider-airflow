@@ -82,12 +82,24 @@ func resourcePoolRead(ctx context.Context, d *schema.ResourceData, m interface{}
 		return diag.Errorf("failed to get pool `%s` from Airflow: %s", d.Id(), err)
 	}
 
-	d.Set("name", pool.Name)
-	d.Set("slots", pool.Slots)
-	d.Set("occupied_slots", pool.OccupiedSlots)
-	d.Set("queued_slots", pool.QueuedSlots)
-	d.Set("open_slots", pool.OpenSlots)
-	d.Set("used_slots", pool.UsedSlots)
+	if err := d.Set("name", pool.Name); err != nil {
+		return diag.FromErr(err)
+	}
+	if err := d.Set("slots", pool.Slots); err != nil {
+		return diag.FromErr(err)
+	}
+	if err := d.Set("occupied_slots", pool.OccupiedSlots); err != nil {
+		return diag.FromErr(err)
+	}
+	if err := d.Set("queued_slots", pool.QueuedSlots); err != nil {
+		return diag.FromErr(err)
+	}
+	if err := d.Set("open_slots", pool.OpenSlots); err != nil {
+		return diag.FromErr(err)
+	}
+	if err := d.Set("used_slots", pool.UsedSlots); err != nil {
+		return diag.FromErr(err)
+	}
 
 	return nil
 }

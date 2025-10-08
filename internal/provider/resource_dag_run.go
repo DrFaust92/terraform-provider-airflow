@@ -103,10 +103,18 @@ func resourceDagRunRead(ctx context.Context, d *schema.ResourceData, m interface
 		return diag.Errorf("failed to get dagRunId `%s` from Airflow: %s", d.Id(), err)
 	}
 
-	d.Set("dag_id", dagRun.DagId)
-	d.Set("dag_run_id", dagRun.DagRunId.Get())
-	d.Set("conf", dagRun.Conf)
-	d.Set("state", dagRun.State)
+	if err := d.Set("dag_id", dagRun.DagId); err != nil {
+		return diag.FromErr(err)
+	}
+	if err := d.Set("dag_run_id", dagRun.DagRunId.Get()); err != nil {
+		return diag.FromErr(err)
+	}
+	if err := d.Set("conf", dagRun.Conf); err != nil {
+		return diag.FromErr(err)
+	}
+	if err := d.Set("state", dagRun.State); err != nil {
+		return diag.FromErr(err)
+	}
 
 	return nil
 }

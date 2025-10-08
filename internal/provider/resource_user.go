@@ -105,15 +105,33 @@ func resourceUserRead(ctx context.Context, d *schema.ResourceData, m interface{}
 		return diag.Errorf("failed to get user `%s` from Airflow: %s", d.Id(), err)
 	}
 
-	d.Set("active", user.GetActive())
-	d.Set("email", user.Email)
-	d.Set("failed_login_count", user.GetFailedLoginCount())
-	d.Set("first_name", user.FirstName)
-	d.Set("last_name", user.LastName)
-	d.Set("login_count", user.GetLastLogin())
-	d.Set("username", user.Username)
-	d.Set("password", d.Get("password").(string))
-	d.Set("roles", flattenAirflowUserRoles(*user.Roles))
+	if err := d.Set("active", user.GetActive()); err != nil {
+		return diag.FromErr(err)
+	}
+	if err := d.Set("email", user.Email); err != nil {
+		return diag.FromErr(err)
+	}
+	if err := d.Set("failed_login_count", user.GetFailedLoginCount()); err != nil {
+		return diag.FromErr(err)
+	}
+	if err := d.Set("first_name", user.FirstName); err != nil {
+		return diag.FromErr(err)
+	}
+	if err := d.Set("last_name", user.LastName); err != nil {
+		return diag.FromErr(err)
+	}
+	if err := d.Set("login_count", user.GetLastLogin()); err != nil {
+		return diag.FromErr(err)
+	}
+	if err := d.Set("username", user.Username); err != nil {
+		return diag.FromErr(err)
+	}
+	if err := d.Set("password", d.Get("password").(string)); err != nil {
+		return diag.FromErr(err)
+	}
+	if err := d.Set("roles", flattenAirflowUserRoles(*user.Roles)); err != nil {
+		return diag.FromErr(err)
+	}
 
 	return nil
 }
