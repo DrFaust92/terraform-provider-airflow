@@ -120,8 +120,10 @@ func resourcePoolRead(ctx context.Context, d *schema.ResourceData, m interface{}
 	if err := d.Set("open_slots", pool.OpenSlots); err != nil {
 		return diag.FromErr(err)
 	}
-	if err := d.Set("description", pool.Description); err != nil {
-		return diag.FromErr(err)
+	if pool.Description.IsSet() && pool.Description.Get() != nil {
+		if err := d.Set("description", *pool.Description.Get()); err != nil {
+			return diag.FromErr(err)
+		}
 	}
 	if err := d.Set("include_deferred", pool.IncludeDeferred); err != nil {
 		return diag.FromErr(err)
