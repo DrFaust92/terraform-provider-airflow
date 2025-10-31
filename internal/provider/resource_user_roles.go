@@ -43,7 +43,7 @@ func resourceUserRolesCreate(ctx context.Context, d *schema.ResourceData, m inte
 	userApi := client.UserApi
 
 	_, _, err := userApi.PatchUser(pcfg.AuthContext, username).UpdateMask([]string{"roles"}).User(airflow.User{
-		Roles:     &roles,
+		Roles:     roles,
 		Username:  &username,
 		FirstName: &username,
 		LastName:  &username,
@@ -73,7 +73,7 @@ func resourceUserRolesRead(ctx context.Context, d *schema.ResourceData, m interf
 	if err := d.Set("username", user.Username); err != nil {
 		return diag.FromErr(err)
 	}
-	if err := d.Set("roles", flattenAirflowUserRoles(*user.Roles)); err != nil {
+	if err := d.Set("roles", flattenAirflowUserRoles(user.Roles)); err != nil {
 		return diag.FromErr(err)
 	}
 
@@ -88,7 +88,7 @@ func resourceUserRolesUpdate(ctx context.Context, d *schema.ResourceData, m inte
 	username := d.Id()
 
 	_, _, err := client.UserApi.PatchUser(pcfg.AuthContext, username).UpdateMask([]string{"roles"}).User(airflow.User{
-		Roles:     &roles,
+		Roles:     roles,
 		Username:  &username,
 		FirstName: &username,
 		LastName:  &username,
@@ -110,7 +110,7 @@ func resourceUserRolesDelete(ctx context.Context, d *schema.ResourceData, m inte
 
 	var err error
 	_, _, _ = client.UserApi.PatchUser(pcfg.AuthContext, username).UpdateMask([]string{"roles"}).User(airflow.User{
-		Roles:     &roles,
+		Roles:     roles,
 		Username:  &username,
 		FirstName: &username,
 		LastName:  &username,

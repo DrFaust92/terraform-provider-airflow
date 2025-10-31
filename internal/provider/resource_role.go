@@ -55,7 +55,7 @@ func resourceRoleCreate(ctx context.Context, d *schema.ResourceData, m interface
 
 	if v, ok := d.GetOk("action"); ok && v.(*schema.Set).Len() > 0 {
 		actions := expandAirflowRoleActions(d.Get("action").(*schema.Set).List())
-		role.Actions = &actions
+		role.Actions = actions
 	}
 
 	_, _, err := varApi.PostRole(pcfg.AuthContext).Role(role).Execute()
@@ -83,7 +83,7 @@ func resourceRoleRead(ctx context.Context, d *schema.ResourceData, m interface{}
 	if err := d.Set("name", role.Name); err != nil {
 		return diag.FromErr(err)
 	}
-	if err := d.Set("action", flattenAirflowRoleActions(*role.Actions)); err != nil {
+	if err := d.Set("action", flattenAirflowRoleActions(role.Actions)); err != nil {
 		return diag.Errorf("error setting action: %s", err)
 	}
 
@@ -98,7 +98,7 @@ func resourceRoleUpdate(ctx context.Context, d *schema.ResourceData, m interface
 	actions := expandAirflowRoleActions(d.Get("action").(*schema.Set).List())
 	role := airflow.Role{
 		Name:    &name,
-		Actions: &actions,
+		Actions: actions,
 	}
 
 	_, _, err := client.RoleApi.PatchRole(pcfg.AuthContext, name).Role(role).Execute()
