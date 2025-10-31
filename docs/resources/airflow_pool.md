@@ -36,6 +36,9 @@ This resource exports the following attributes:
 * `occupied_slots` - The number of slots used by running/queued tasks at the moment.
 * `queued_slots` - The number of slots used by queued tasks at the moment.
 * `open_slots` - The number of free slots at the moment.
+* `running_slots` - The number of slots used by running tasks at the moment.
+* `deferred_slots` - The number of slots used by deferred tasks at the moment.
+* `scheduled_slots` - The number of slots used by scheduled tasks at the moment.
 
 ## Import
 
