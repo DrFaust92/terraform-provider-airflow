@@ -82,7 +82,7 @@ func resourceUserCreate(ctx context.Context, d *schema.ResourceData, m interface
 		LastName:  &lastName,
 		Username:  &username,
 		Password:  &password,
-		Roles:     &roles,
+		Roles:     roles,
 	}).Execute()
 	if err != nil {
 		return diag.Errorf("failed to create user `%s` from Airflow: %s", email, err)
@@ -129,7 +129,7 @@ func resourceUserRead(ctx context.Context, d *schema.ResourceData, m interface{}
 	if err := d.Set("password", d.Get("password").(string)); err != nil {
 		return diag.FromErr(err)
 	}
-	if err := d.Set("roles", flattenAirflowUserRoles(*user.Roles)); err != nil {
+	if err := d.Set("roles", flattenAirflowUserRoles(user.Roles)); err != nil {
 		return diag.FromErr(err)
 	}
 
@@ -152,7 +152,7 @@ func resourceUserUpdate(ctx context.Context, d *schema.ResourceData, m interface
 		FirstName: &firstName,
 		LastName:  &lastName,
 		Password:  &password,
-		Roles:     &roles,
+		Roles:     roles,
 		Username:  &username,
 	}).Execute()
 	if err != nil {

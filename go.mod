@@ -60,3 +60,5 @@ require (
 	google.golang.org/grpc v1.75.1 // indirect
 	google.golang.org/protobuf v1.36.9 // indirect
 )
+
+replace github.com/apache/airflow-client-go/airflow => github.com/drfaust92/airflow-client-go/airflow v0.0.0-20250103045940-da4c5c1666ad

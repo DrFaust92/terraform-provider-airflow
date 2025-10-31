@@ -66,7 +66,7 @@ func testAccCheckAirflowUserRolesCheckDestroy(s *terraform.State) error {
 
 		user, res, err := client.ApiClient.UserApi.GetUser(client.AuthContext, rs.Primary.ID).Execute()
 		if err == nil {
-			if len(*user.Roles) != 0 {
+			if len(user.Roles) != 0 {
 				return fmt.Errorf("Airflow User (%s) still have some roles.", rs.Primary.ID)
 			}
 		}
@@ -169,7 +169,7 @@ func testAccPreCheckCreateUser(t *testing.T) {
 		LastName:  &lastName,
 		Username:  &username,
 		Password:  &password,
-		Roles:     &roles,
+		Roles:     roles,
 	}).Execute()
 	if err != nil {
 		t.Fatalf("failed to create user `%s` from Airflow: %s", username, err)
