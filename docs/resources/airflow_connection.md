@@ -31,6 +31,8 @@ The following arguments are supported:
 * `schema` - (Optional) The schema of the connection.
 * `port` - (Optional) The port of the connection.
 * `password` - (Optional) The paasword of the connection.
+* `password_wo` - (Optional, Write-Only) The password of the connection. This field is write-only and will not be returned by the API.
+* `password_wo_version` - (Optional) Triggers update of `password_wo` write-only. For more info see [updating write-only attributes](/docs/providers/google/guides/using_write_only_attributes.html#updating-write-only-attributes).
 * `extra` - (Optional) Other values that cannot be put into another field, e.g. RSA keys.
 
 ## Attributes Reference
