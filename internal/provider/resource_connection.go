@@ -67,7 +67,7 @@ func resourceConnection() *schema.Resource {
 			"password_wo_version": {
 				Type:         schema.TypeString,
 				Optional:     true,
-				Description:  `Triggers update of password_wo write-only. For more info see [updating write-only attributes](/docs/providers/google/guides/using_write_only_attributes.html#updating-write-only-attributes)`,
+				Description:  `Triggers update of password_wo write-only. For more info see [updating write-only attributes](https://developer.hashicorp.com/terraform/language/manage-sensitive-data/write-only)`,
 				RequiredWith: []string{"password_wo"},
 			},
 			"extra": {
