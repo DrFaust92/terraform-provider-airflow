@@ -53,8 +53,22 @@ func resourceConnection() *schema.Resource {
 				ValidateFunc: validation.IsPortNumberOrZero,
 			},
 			"password": {
-				Type:     schema.TypeString,
-				Optional: true,
+				Type:      schema.TypeString,
+				Optional:  true,
+				Sensitive: true,
+			},
+			"password_wo": {
+				Type:         schema.TypeString,
+				Optional:     true,
+				WriteOnly:    true,
+				ExactlyOneOf: []string{"password", "password_wo"},
+				RequiredWith: []string{"password_wo_version"},
+			},
+			"password_wo_version": {
+				Type:         schema.TypeString,
+				Optional:     true,
+				Description:  `Triggers update of password_wo write-only. For more info see [updating write-only attributes](https://developer.hashicorp.com/terraform/language/manage-sensitive-data/write-only)`,
+				RequiredWith: []string{"password_wo"},
 			},
 			"extra": {
 				Type:             schema.TypeString,
@@ -114,7 +128,11 @@ func resourceConnectionCreate(ctx context.Context, d *schema.ResourceData, m int
 		conn.SetPort(int32(v.(int)))
 	}
 
-	conn.SetPassword(d.Get("password").(string))
+	if v, ok := d.GetOk("password"); ok {
+		conn.SetPassword(v.(string))
+	} else if v, ok := d.GetOk("password_wo"); ok {
+		conn.SetPassword(v.(string))
+	}
 
 	if v, ok := d.GetOk("extra"); ok {
 		conn.SetExtra(v.(string))
@@ -223,6 +241,8 @@ func resourceConnectionUpdate(ctx context.Context, d *schema.ResourceData, m int
 	}
 
 	if v, ok := d.GetOk("password"); ok && v.(string) != "" {
+		conn.SetPassword(v.(string))
+	} else if v, ok := d.GetOk("password_wo"); ok && v.(string) != "" {
 		conn.SetPassword(v.(string))
 	}
 
