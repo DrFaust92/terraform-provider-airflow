@@ -56,13 +56,13 @@ func resourceConnection() *schema.Resource {
 				Type:          schema.TypeString,
 				Optional:      true,
 				Sensitive:     true,
-				ConflictsWith: []string{"password", "password_wo"},
+				ConflictsWith: []string{"password_wo"},
 			},
 			"password_wo": {
 				Type:          schema.TypeString,
 				Optional:      true,
 				WriteOnly:     true,
-				ConflictsWith: []string{"password", "password_wo"},
+				ConflictsWith: []string{"password"},
 				RequiredWith:  []string{"password_wo_version"},
 			},
 			"password_wo_version": {
