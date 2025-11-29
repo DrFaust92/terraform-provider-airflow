@@ -102,6 +102,8 @@ func resourceVariableUpdate(ctx context.Context, d *schema.ResourceData, m inter
 
 	if v, ok := d.GetOk("description"); ok {
 		variableReq.SetDescription(v.(string))
+	} else {
+		variableReq.SetDescription("")
 	}
 
 	_, resp, err := client.VariableApi.PatchVariable(pcfg.AuthContext, key).Variable(variableReq).Execute()

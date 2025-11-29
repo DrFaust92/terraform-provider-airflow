@@ -2,6 +2,7 @@ package provider
 
 import (
 	"fmt"
+	"os"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/acctest"
@@ -9,8 +10,12 @@ import (
 	"github.com/hashicorp/terraform-plugin-sdk/v2/terraform"
 )
 
+var dagId = "example_bash_operator"
+
 func TestAccAirflowDagRun_basic(t *testing.T) {
-	dagId := "example_bash_operator"
+	if os.Getenv("SKIP_AIRFLOW_DAG_TESTS") == "true" {
+		t.Skip("Skipping Airflow DAG tests")
+	}
 
 	resourceName := "airflow_dag_run.test"
 	resource.Test(t, resource.TestCase{
@@ -37,8 +42,11 @@ func TestAccAirflowDagRun_basic(t *testing.T) {
 }
 
 func TestAccAirflowDagRun_dagRunId(t *testing.T) {
+	if os.Getenv("SKIP_AIRFLOW_DAG_TESTS") == "true" {
+		t.Skip("Skipping Airflow DAG tests")
+	}
+
 	dagRunId := acctest.RandomWithPrefix("tf-acc-test")
-	dagId := "example_bash_operator"
 
 	resourceName := "airflow_dag_run.test"
 	resource.Test(t, resource.TestCase{
@@ -65,8 +73,9 @@ func TestAccAirflowDagRun_dagRunId(t *testing.T) {
 }
 
 func TestAccAirflowDagRun_conf(t *testing.T) {
-	dagId := "example_bash_operator"
-
+	if os.Getenv("SKIP_AIRFLOW_DAG_TESTS") == "true" {
+		t.Skip("Skipping Airflow DAG tests")
+	}
 	resourceName := "airflow_dag_run.test"
 	resource.Test(t, resource.TestCase{
 		PreCheck:     func() { testAccPreCheck(t) },
