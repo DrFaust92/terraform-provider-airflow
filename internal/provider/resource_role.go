@@ -50,12 +50,8 @@ func resourceRoleCreate(ctx context.Context, d *schema.ResourceData, m interface
 	name := d.Get("name").(string)
 	varApi := client.RoleApi
 	role := airflow.Role{
-		Name: &name,
-	}
-
-	if v, ok := d.GetOk("action"); ok && v.(*schema.Set).Len() > 0 {
-		actions := expandAirflowRoleActions(d.Get("action").(*schema.Set).List())
-		role.Actions = actions
+		Name:    &name,
+		Actions: expandAirflowRoleActions(d.Get("action").(*schema.Set).List()),
 	}
 
 	_, _, err := varApi.PostRole(pcfg.AuthContext).Role(role).Execute()

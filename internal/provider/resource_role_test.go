@@ -34,6 +34,17 @@ func TestAccAirflowRole_basic(t *testing.T) {
 				ImportState:       true,
 				ImportStateVerify: true,
 			},
+			// { // Disabled due to issue with Airflow API that prevents updating role actions
+			// 	Config: testAccAirflowRoleConfigBasic(rName, "can_edit", "Connections"),
+			// 	Check: resource.ComposeTestCheckFunc(
+			// 		resource.TestCheckResourceAttr(resourceName, "name", rName),
+			// 		resource.TestCheckResourceAttr(resourceName, "action.#", "1"),
+			// 		resource.TestCheckTypeSetElemNestedAttrs(resourceName, "action.*", map[string]string{
+			// 			"action":   "can_edit",
+			// 			"resource": "Connections",
+			// 		}),
+			// 	),
+			// },
 		},
 	})
 }
