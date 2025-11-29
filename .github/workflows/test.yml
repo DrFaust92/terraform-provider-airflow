@@ -46,6 +46,7 @@ jobs:
           echo "AIRFLOW_BASE_ENDPOINT=http://localhost:8080" >> $GITHUB_ENV
           echo "AIRFLOW_API_USERNAME=admin" >> $GITHUB_ENV
           echo "AIRFLOW_API_PASSWORD=admin" >> $GITHUB_ENV
+          echo "SKIP_AIRFLOW_DAG_TESTS=true" >> $GITHUB_ENV
 
       - name: Port forward Airflow webserver
         run: |

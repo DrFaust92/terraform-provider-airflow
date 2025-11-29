@@ -16,6 +16,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
 )
 
+var BASE_PATH = "/api/v1" // TODO: make configurable? for airflow v2 or special cases like aws?
+
 type ProviderConfig struct {
 	ApiClient   *airflow.APIClient
 	AuthContext context.Context
@@ -131,7 +133,7 @@ func providerConfigure(_ context.Context, d *schema.ResourceData) (interface{}, 
 		HTTPClient: client,
 		Servers: airflow.ServerConfigurations{
 			{
-				URL:         fmt.Sprint(path, "/api/v1"),
+				URL:         fmt.Sprint(path, BASE_PATH),
 				Description: "Apache Airflow Stable API.",
 			},
 		},

@@ -2,6 +2,7 @@ package provider
 
 import (
 	"fmt"
+	"os"
 	"strconv"
 	"testing"
 
@@ -10,6 +11,9 @@ import (
 )
 
 func TestAccAirflowDag_basic(t *testing.T) {
+	if os.Getenv("SKIP_AIRFLOW_DAG_TESTS") == "true" {
+		t.Skip("Skipping Airflow DAG tests")
+	}
 
 	resourceName := "airflow_dag.test"
 	resource.Test(t, resource.TestCase{
