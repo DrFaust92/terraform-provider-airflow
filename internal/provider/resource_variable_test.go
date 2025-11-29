@@ -122,7 +122,7 @@ func testAccAirflowVariableConfigDesc(rName, value string) string {
 resource "airflow_variable" "test" {
   key          = %[1]q
   value        = %[2]q
-  description  = "test"
+  description  = %[2]q
 }
 `, rName, value)
 }
