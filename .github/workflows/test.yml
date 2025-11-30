@@ -43,13 +43,32 @@ jobs:
             --timeout 3m \
             --wait
 
+
+
       - name: Set Airflow environment variable
         run: |
           echo "AIRFLOW_BASE_ENDPOINT=http://localhost:8080" >> $GITHUB_ENV
-          echo "AIRFLOW_API_USERNAME=admin" >> $GITHUB_ENV
-          echo "AIRFLOW_API_PASSWORD=admin" >> $GITHUB_ENV
           echo "SKIP_AIRFLOW_DAG_TESTS=true" >> $GITHUB_ENV
           echo "AIRFLOW_API_BASE_PATH=/api/v2" >> $GITHUB_ENV
+
+      - name: Obtain Airflow JWT token
+        run: |
+          set -euo pipefail
+          ENDPOINT_URL="http://localhost:8080"
+          # Try to install jq if it's not present
+          if ! command -v jq >/dev/null 2>&1; then
+            echo "jq not found, installing..."
+            sudo apt-get update && sudo apt-get install -y jq
+          fi
+
+          resp=$(curl -s -X POST "${ENDPOINT_URL}/auth/token" -H 'Content-Type: application/json' -d '{"username": "admin", "password": "admin"}')
+          # extract token - try common fields
+          token=$(echo "$resp" | jq -r '.access_token // .token // .access // empty')
+          if [ -z "$token" ] || [ "$token" = "null" ]; then
+            echo "Failed to obtain token from response: $resp"
+            exit 1
+          fi
+          echo "AIRFLOW_OAUTH2_TOKEN=$token" >> $GITHUB_ENV
 
       - name: Port forward Airflow webserver
         run: |
