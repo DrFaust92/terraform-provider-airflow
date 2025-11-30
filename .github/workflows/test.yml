@@ -43,13 +43,16 @@ jobs:
             --timeout 3m \
             --wait
 
-
-
       - name: Set Airflow environment variable
         run: |
           echo "AIRFLOW_BASE_ENDPOINT=http://localhost:8080" >> $GITHUB_ENV
           echo "SKIP_AIRFLOW_DAG_TESTS=true" >> $GITHUB_ENV
           echo "AIRFLOW_API_BASE_PATH=/api/v2" >> $GITHUB_ENV
+
+      - name: Port forward Airflow webserver
+        run: |
+          kubectl port-forward svc/airflow-api-server 8080:8080 &
+          sleep 5
 
       - name: Obtain Airflow JWT token
         run: |
@@ -69,11 +72,6 @@ jobs:
             exit 1
           fi
           echo "AIRFLOW_OAUTH2_TOKEN=$token" >> $GITHUB_ENV
-
-      - name: Port forward Airflow webserver
-        run: |
-          kubectl port-forward svc/airflow-api-server 8080:8080 &
-          sleep 5
 
       - name: Run integration tests
         run: |
