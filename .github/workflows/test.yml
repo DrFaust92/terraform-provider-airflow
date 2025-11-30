@@ -72,3 +72,56 @@ jobs:
       - name: Run integration tests
         run: |
           make testacc
+  testV1:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: "go.mod"
+          cache: true
+      
+      - name: Create k8s Kind Cluster
+        uses: helm/kind-action@v1
+
+      - name: Add Airflow Helm repository
+        run: helm repo add apache-airflow https://airflow.apache.org && helm repo update
+      
+      - name: Install Airflow
+        run: |
+          helm upgrade --install airflow apache-airflow/airflow --version 1.16.0 \
+            --set postgresql.image.repository=bitnamilegacy/postgresql \
+            --set postgresql.image.tag=16.1.0-debian-11-r15 \
+            --set executor=KubernetesExecutor \
+            --set workers.replicas=0 \
+            --set redis.enabled=false \
+            --set triggerer.enabled=false \
+            --set statsd.enabled=false \
+            --set createUserJob.useHelmHooks=false \
+            --set createUserJob.applyCustomEnv=false \
+            --set migrateDatabaseJob.useHelmHooks=false \
+            --set migrateDatabaseJob.applyCustomEnv=false \
+            --set webserver.resources.requests.memory=1Gi \
+            --set webserver.resources.limits.memory=1Gi \
+            --set config.api.auth_backend=airflow.api.auth.backend.basic_auth \
+            --timeout 3m \
+            --wait
+
+      - name: Set Airflow environment variable
+        run: |
+          echo "AIRFLOW_BASE_ENDPOINT=http://localhost:8080" >> $GITHUB_ENV
+          echo "AIRFLOW_API_USERNAME=admin" >> $GITHUB_ENV
+          echo "AIRFLOW_API_PASSWORD=admin" >> $GITHUB_ENV
+          echo "SKIP_AIRFLOW_DAG_TESTS=true" >> $GITHUB_ENV
+
+      - name: Port forward Airflow webserver
+        run: |
+          kubectl port-forward svc/airflow-webserver 8080:8080 &
+          sleep 5
+
+      - name: Run integration tests
+        run: |
+          make testacc
