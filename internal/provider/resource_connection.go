@@ -53,9 +53,9 @@ func resourceConnection() *schema.Resource {
 				ValidateFunc: validation.IsPortNumberOrZero,
 			},
 			"password": {
-				Type:     schema.TypeString,
-				Optional: true,
-				// Sensitive: true,
+				Type:      schema.TypeString,
+				Optional:  true,
+				Sensitive: true,
 				DiffSuppressFunc: func(k, old, new string, d *schema.ResourceData) bool {
 					// Suppress diffs only when the new value is a masked placeholder
 					// returned by the API (e.g. "***"). This prevents Terraform
@@ -102,14 +102,102 @@ func suppressSameJsonDiff(k, oldo, newo string, d *schema.ResourceData) bool {
 	var oldIface interface{}
 	var newIface interface{}
 
-	if err := json.Unmarshal([]byte(oldo), &oldIface); err != nil {
-		return false
+	// Try to unmarshal both; keep errors for conditional handling below
+	oldErr := json.Unmarshal([]byte(oldo), &oldIface)
+	newErr := json.Unmarshal([]byte(newo), &newIface)
+
+	// Helper: consider nil, empty map, and empty slice as 'empty JSON'
+	isEmptyJSON := func(v interface{}) bool {
+		if v == nil {
+			return true
+		}
+		switch t := v.(type) {
+		case map[string]interface{}:
+			return len(t) == 0
+		case []interface{}:
+			return len(t) == 0
+		default:
+			return false
+		}
 	}
-	if err := json.Unmarshal([]byte(newo), &newIface); err != nil {
+
+	// If both unmarshaled successfully, compare deeply. Before comparing,
+	// replace any masked placeholder strings (e.g. "***") in the API/new
+	// value with the corresponding value from the old/state value when
+	// available. This avoids diffs when the API hides sensitive values.
+	if oldErr == nil && newErr == nil {
+		// helper to replace masked strings in new with values from old when possible
+		var replaceMasked func(n, o interface{}) interface{}
+		replaceMasked = func(n, o interface{}) interface{} {
+			switch nv := n.(type) {
+			case map[string]interface{}:
+				// create a new map to avoid mutating original
+				out := map[string]interface{}{}
+				var ov map[string]interface{}
+				if ovt, ok := o.(map[string]interface{}); ok {
+					ov = ovt
+				}
+				for k, v := range nv {
+					out[k] = replaceMasked(v, func() interface{} {
+						if ov != nil {
+							return ov[k]
+						}
+						return nil
+					}())
+				}
+				return out
+			case []interface{}:
+				out := make([]interface{}, len(nv))
+				var ov []interface{}
+				if ovt, ok := o.([]interface{}); ok {
+					ov = ovt
+				}
+				for i := range nv {
+					var oe interface{}
+					if ov != nil && i < len(ov) {
+						oe = ov[i]
+					}
+					out[i] = replaceMasked(nv[i], oe)
+				}
+				return out
+			case string:
+				s := nv
+				if strings.TrimSpace(s) != "" && strings.Trim(s, "*") == "" {
+					if os, ok := o.(string); ok && os != "" {
+						return os
+					}
+				}
+				return s
+			default:
+				return nv
+			}
+		}
+
+		newNorm := replaceMasked(newIface, oldIface)
+		if reflect.DeepEqual(oldIface, newNorm) {
+			return true
+		}
+		// treat empty vs null/empty-object/empty-array as equivalent
+		if isEmptyJSON(oldIface) && isEmptyJSON(newIface) {
+			return true
+		}
 		return false
 	}
 
-	return reflect.DeepEqual(oldIface, newIface)
+	// If one side failed to unmarshal but the other unmarshaled to an empty JSON
+	// value (null/{} / []), treat them as equal to avoid spurious diffs.
+	if oldErr != nil && newErr == nil {
+		if isEmptyJSON(newIface) && strings.TrimSpace(oldo) == "" {
+			return true
+		}
+	}
+	if newErr != nil && oldErr == nil {
+		if isEmptyJSON(oldIface) && strings.TrimSpace(newo) == "" {
+			return true
+		}
+	}
+
+	return false
 }
 
 func resourceConnectionCreate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
@@ -194,8 +282,22 @@ func resourceConnectionRead(ctx context.Context, d *schema.ResourceData, m inter
 	if err := d.Set("port", connection.GetPort()); err != nil {
 		return diag.FromErr(err)
 	}
-	if err := d.Set("extra", connection.GetExtra()); err != nil {
-		return diag.FromErr(err)
+	// Handle `extra` carefully: the API may return semantically equivalent
+	// JSON with different formatting which should not cause diffs. Use the
+	// existing `suppressSameJsonDiff` helper to avoid overwriting the state
+	// when the values are equivalent. If the API returns an empty string or
+	// a JSON null/empty object, prefer keeping the current state value.
+	apiExtra := connection.GetExtra()
+	if apiExtra != "" {
+		var oldExtra string
+		if v, ok := d.GetOk("extra"); ok {
+			oldExtra = v.(string)
+		}
+		if !suppressSameJsonDiff("extra", oldExtra, apiExtra, d) {
+			if err := d.Set("extra", apiExtra); err != nil {
+				return diag.FromErr(err)
+			}
+		}
 	}
 	if err := d.Set("description", connection.GetDescription()); err != nil {
 		return diag.FromErr(err)
