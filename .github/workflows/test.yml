@@ -49,13 +49,11 @@ jobs:
           echo "SKIP_AIRFLOW_DAG_TESTS=true" >> $GITHUB_ENV
           echo "AIRFLOW_API_BASE_PATH=/api/v2" >> $GITHUB_ENV
 
-      - name: Port forward Airflow webserver
-        run: |
-
       - name: Obtain Airflow JWT token
         run: |
           set -euo pipefail
-          kubectl port-forward svc/airflow-api-server 8080:8080
+          kubectl port-forward svc/airflow-api-server 8080:8080 &
+          sleep 5  # wait for port-forward to be established
           # Try to install jq if it's not present
           if ! command -v jq >/dev/null 2>&1; then
             echo "jq not found, installing..."
