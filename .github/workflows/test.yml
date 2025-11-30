@@ -30,6 +30,8 @@ jobs:
             --set workers.replicas=0 \
             --set redis.enabled=false \
             --set triggerer.enabled=false \
+            --set dagProcessor.enabled=false \
+            --set scheduler.enabled=false \
             --set statsd.enabled=false \
             --set createUserJob.useHelmHooks=false \
             --set createUserJob.applyCustomEnv=false \
@@ -51,7 +53,7 @@ jobs:
 
       - name: Port forward Airflow webserver
         run: |
-          kubectl port-forward svc/airflow-webserver 8080:8080 &
+          kubectl port-forward svc/airflow-api-server 8080:8080 &
           sleep 5
 
       - name: Run integration tests
