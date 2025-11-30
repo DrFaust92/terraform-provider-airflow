@@ -34,6 +34,35 @@ func TestAccAirflowConnection_basic(t *testing.T) {
 	})
 }
 
+func TestAccAirflowConnection_passwordWO(t *testing.T) {
+	rName := acctest.RandomWithPrefix("tf-acc-test")
+
+	resourceName := "airflow_connection.test"
+	resource.Test(t, resource.TestCase{
+		PreCheck:     func() { testAccPreCheck(t) },
+		Providers:    testAccProviders,
+		CheckDestroy: testAccCheckAirflowConnectionCheckDestroy,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccAirflowConnectionConfigPasswordWO(rName, "Mustbe8characters", 1),
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr(resourceName, "connection_id", rName),
+					resource.TestCheckResourceAttr(resourceName, "conn_type", "http"),
+					resource.TestCheckResourceAttr(resourceName, "password_wo_version", "1"),
+				),
+			},
+			{
+				Config: testAccAirflowConnectionConfigPasswordWO(rName, "Mustbe8charactersupdated", 2),
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr(resourceName, "connection_id", rName),
+					resource.TestCheckResourceAttr(resourceName, "conn_type", "http"),
+					resource.TestCheckResourceAttr(resourceName, "password_wo_version", "2"),
+				),
+			},
+		},
+	})
+}
+
 func TestAccAirflowConnection_full(t *testing.T) {
 	rName := acctest.RandomWithPrefix("tf-acc-test")
 	rNameUpdated := acctest.RandomWithPrefix("tf-acc-test")
@@ -141,4 +170,15 @@ resource "airflow_connection" "test" {
   extra         = %[2]q
 }
 `, rName, rName2, port)
+}
+
+func testAccAirflowConnectionConfigPasswordWO(rName, password string, passwordVersion int) string {
+	return fmt.Sprintf(`
+resource "airflow_connection" "test" {
+  connection_id 	  = %[1]q
+  conn_type     	  = "http"
+  password_wo   	  = %[2]q
+  password_wo_version = %[3]d
+}
+`, rName, password, passwordVersion)
 }
