@@ -51,20 +51,18 @@ jobs:
 
       - name: Port forward Airflow webserver
         run: |
-          kubectl port-forward svc/airflow-api-server 8080:8080 &
-          sleep 5
 
       - name: Obtain Airflow JWT token
         run: |
           set -euo pipefail
-          ENDPOINT_URL="http://localhost:8080"
+          kubectl port-forward svc/airflow-api-server 8080:8080
           # Try to install jq if it's not present
           if ! command -v jq >/dev/null 2>&1; then
             echo "jq not found, installing..."
             sudo apt-get update && sudo apt-get install -y jq
           fi
 
-          resp=$(curl -s -X POST "${ENDPOINT_URL}/auth/token" -H 'Content-Type: application/json' -d '{"username": "admin", "password": "admin"}')
+          resp=$(curl -s -X POST "${AIRFLOW_BASE_ENDPOINT}/auth/token" -H 'Content-Type: application/json' -d '{"username": "admin", "password": "admin"}')
           # extract token - try common fields
           token=$(echo "$resp" | jq -r '.access_token // .token // .access // empty')
           if [ -z "$token" ] || [ "$token" = "null" ]; then
