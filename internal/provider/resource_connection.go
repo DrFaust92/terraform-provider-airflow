@@ -74,7 +74,9 @@ func resourceConnection() *schema.Resource {
 			"extra": {
 				Type:             schema.TypeString,
 				DiffSuppressFunc: suppressSameJsonDiff,
+				ValidateFunc:     validation.StringIsJSON,
 				Optional:         true,
+				Sensitive:        true,
 			},
 		},
 	}
