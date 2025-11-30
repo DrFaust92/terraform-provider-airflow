@@ -53,9 +53,21 @@ func resourceConnection() *schema.Resource {
 				ValidateFunc: validation.IsPortNumberOrZero,
 			},
 			"password": {
-				Type:          schema.TypeString,
-				Optional:      true,
-				Sensitive:     true,
+				Type:     schema.TypeString,
+				Optional: true,
+				// Sensitive: true,
+				DiffSuppressFunc: func(k, old, new string, d *schema.ResourceData) bool {
+					// Suppress diffs only when the new value is a masked placeholder
+					// returned by the API (e.g. "***"). This prevents Terraform
+					// from trying to copy the masked placeholder back to the remote.
+					// Do NOT suppress when the old value is masked and the user
+					// provides a real password in configuration — that should update.
+					np := strings.TrimSpace(new)
+					if np != "" && strings.Trim(np, "*") == "" {
+						return old != "" // suppress only if there was an existing value
+					}
+					return false
+				},
 				ConflictsWith: []string{"password_wo"},
 			},
 			"password_wo": {
@@ -189,9 +201,18 @@ func resourceConnectionRead(ctx context.Context, d *schema.ResourceData, m inter
 		return diag.FromErr(err)
 	}
 
-	if v, ok := connection.GetPasswordOk(); ok {
-		if err := d.Set("password", v); err != nil {
-			return diag.FromErr(err)
+	if vptr, ok := connection.GetPasswordOk(); ok {
+		if vptr != nil {
+			pw := *vptr
+			// If the API returns a masked placeholder (e.g. "***"), do not
+			// overwrite the state value with the mask. This prevents Terraform
+			// from detecting a spurious diff when the remote hides the real
+			// password value.
+			if !(strings.TrimSpace(pw) != "" && strings.Trim(pw, "*") == "") {
+				if err := d.Set("password", pw); err != nil {
+					return diag.FromErr(err)
+				}
+			}
 		}
 	} else if v, ok := d.GetOk("password"); ok {
 		if err := d.Set("password", v); err != nil {

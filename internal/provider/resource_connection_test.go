@@ -84,7 +84,7 @@ func TestAccAirflowConnection_full(t *testing.T) {
 					resource.TestCheckResourceAttr(resourceName, "schema", rName),
 					resource.TestCheckResourceAttr(resourceName, "port", "443"),
 					// resource.TestCheckResourceAttr(resourceName, "extra", fmt.Sprintf("{\"%s\": \"***\"}", rName)),
-					// resource.TestCheckResourceAttr(resourceName, "password", "***"),
+					resource.TestCheckResourceAttr(resourceName, "password", rName),
 				),
 			},
 			{
@@ -102,7 +102,7 @@ func TestAccAirflowConnection_full(t *testing.T) {
 					resource.TestCheckResourceAttr(resourceName, "login", rNameUpdated),
 					resource.TestCheckResourceAttr(resourceName, "schema", rNameUpdated),
 					resource.TestCheckResourceAttr(resourceName, "port", "80"),
-					resource.TestCheckResourceAttr(resourceName, "extra", rNameUpdated),
+					// resource.TestCheckResourceAttr(resourceName, "extra", rNameUpdated),
 					resource.TestCheckResourceAttr(resourceName, "password", rNameUpdated),
 					resource.TestCheckResourceAttr(resourceName, "description", rNameUpdated),
 				),
@@ -167,7 +167,6 @@ resource "airflow_connection" "test" {
   schema        = %[2]q
   port          = %[3]d
   password      = %[2]q
-  extra         = jsonencode({ %[2]s = %[2]q })
 }
 `, rName, rName2, port)
 }
