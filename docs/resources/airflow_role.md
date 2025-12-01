@@ -6,6 +6,10 @@ description: |-
   Provides an Airflow role
 ---
 
+# Note
+
+> Not supported on Airflow v3 (API v2): the Roles API is not available in Airflow v3.
+
 # airflow_role
 
 Provides an Airflow role.
