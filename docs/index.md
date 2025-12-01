@@ -74,6 +74,7 @@ provider "airflow" {
 - `username` - (Optional) The username to use for API basic authentication. **Conflicts with oauth2_token**
 - `password` - (Optional) The password to use for API basic authentication. **Conflicts with oauth2_token**
 - `disable_ssl_verification` - (Optional) Disable SSL verification. Default is `false`
+- `base_path` - (Optional) Base path for the Airflow API. Default is `/api/v1`. pass `/api/v1` for Airflow v3 (API v2).
 
 ## Running Acceptence Tests
 
