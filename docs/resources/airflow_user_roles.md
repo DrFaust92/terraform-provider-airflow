@@ -6,13 +6,11 @@ description: |-
   Provides an Airflow user roles
 ---
 
-# Note
-
-> Not supported on Airflow v3 (API v2): the User Roles API is not available in Airflow v3.
-
-# airflow_user roles
+# airflow_user_roles
 
 Provides an Airflow user roles management.
+
+> Note this resource is not supported on Airflow v3 (API v2): the User Roles API is not available in Airflow v3.
 
 ## Example Usage
 

@@ -6,13 +6,11 @@ description: |-
   Provides an Airflow user
 ---
 
-# Note
-
-> Not supported on Airflow v3 (API v2): the Users API is not available in Airflow v3.
-
 # airflow_user
 
 Provides an Airflow user.
+
+> Note this resource is not supported on Airflow v3 (API v2): the Users API is not available in Airflow v3.
 
 ## Example Usage
 
