@@ -110,6 +110,18 @@ provider "airflow" {
 }
 ```
 
+### Airflow V3 (API v2)
+
+In Airflow v3 (API v2) you cannot use basic auth anymore, you have to use OAUTH2 identity token. it can be generated via a user/password for a temporary jwt via:
+
+```bash
+curl -X POST https://airflow-server.net/auth/token \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "user",
+    "password": "password"
+  }'
+
 ## Argument Reference
 
 - `base_endpoint` - (Required) The Airflow API endpoint.
