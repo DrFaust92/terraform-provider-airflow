@@ -30,7 +30,7 @@ resource "airflow_variable" "default" {
 
 ## Authentication
 
-### Google Composer Example (OAUTH2 token)
+### Google Composer 1 Example (OAUTH2 identity token)
 
 ```terraform
 data "http" "client_id" {
@@ -58,13 +58,73 @@ data "google_service_account_id_token" "oidc" {
   target_service_account = google_service_account.example.email
   delegates              = []
   include_email          = true
-  target_audience        = regex("[A-Za-z0-9-]*\\.apps\\.googleusercontent\\.com", data.http.client_id.body)
+  target_audience        = regex("[A-Za-z0-9-]*\\.apps\\.googleusercontent\\.com", data.http.client_id.response_body)
 }
 
 provider "airflow" {
   base_endpoint = data.http.client_id.url
   oauth2_token  = data.google_service_account_id_token.oidc.id_token
 }
+```
+
+### Google Composer 2 Example (OAUTH2 access token)
+
+Composer 2 changes how the API is accessed by the provider, you can just use the composer airflow web UI endpoint, and you can use a standard access token.
+
+#### With service account impersionation
+
+```terraform
+resource "google_service_account" "example" {
+  account_id = "example"
+}
+
+data "google_service_account_access_token" "impersonated" {
+  target_service_account = google_service_account.example.email
+  delegates              = []
+  scopes                 = ["userinfo-email", "cloud-platform"]
+  lifetime               = "300s"
+}
+
+provider "google" {
+  alias        = "impersonated"
+  access_token = data.google_service_account_access_token.impersonated.access_token
+}
+
+data "google_client_config" "airflow" {
+  provider = google.impersonated
+}
+
+provider "airflow" {
+  base_endpoint = composer-url
+  oauth2_token  = data.google_client_config.airflow.access_token
+}
+
+```
+
+#### Using the default provider & service account
+
+```terraform
+data "google_client_config" "airflow" {
+  provider = google
+}
+
+provider "airflow" {
+  base_endpoint = composer-url
+  oauth2_token  = data.google_client_config.airflow.access_token
+}
+```
+
+### Airflow V3 (API v2)
+
+In Airflow v3 (API v2) you cannot use basic auth anymore, you have to use OAUTH2 identity token. it can be generated via a user/password for a temporary jwt via:
+
+```bash
+curl -X POST https://airflow-server.net/auth/token \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "user",
+    "password": "password"
+  }'
 ```
 
 ## Argument Reference
