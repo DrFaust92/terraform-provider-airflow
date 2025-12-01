@@ -310,7 +310,7 @@ func resourceConnectionRead(ctx context.Context, d *schema.ResourceData, m inter
 			// overwrite the state value with the mask. This prevents Terraform
 			// from detecting a spurious diff when the remote hides the real
 			// password value.
-			if !(strings.TrimSpace(pw) != "" && strings.Trim(pw, "*") == "") {
+			if strings.TrimSpace(pw) == "" || strings.Trim(pw, "*") != "" {
 				if err := d.Set("password", pw); err != nil {
 					return diag.FromErr(err)
 				}
