@@ -23,7 +23,8 @@ jobs:
       
       - name: Install Airflow
         run: |
-          helm upgrade --install airflow apache-airflow/airflow --version 1.18.0 \ # v3 helm chart
+          # airflow v3 helm chart
+          helm upgrade --install airflow apache-airflow/airflow --version 1.18.0 \
             --set postgresql.image.repository=bitnamilegacy/postgresql \
             --set postgresql.image.tag=16.1.0-debian-11-r15 \
             --set executor=KubernetesExecutor \
@@ -92,7 +93,8 @@ jobs:
       
       - name: Install Airflow
         run: |
-          helm upgrade --install airflow apache-airflow/airflow --version 1.16.0 \ # v1 helm chart
+          # airflow v2 helm chart
+          helm upgrade --install airflow apache-airflow/airflow --version 1.16.0 \
             --set postgresql.image.repository=bitnamilegacy/postgresql \
             --set postgresql.image.tag=16.1.0-debian-11-r15 \
             --set executor=KubernetesExecutor \
