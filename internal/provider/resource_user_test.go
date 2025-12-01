@@ -2,6 +2,7 @@ package provider
 
 import (
 	"fmt"
+	"os"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/acctest"
@@ -10,6 +11,9 @@ import (
 )
 
 func TestAccAirflowUser_basic(t *testing.T) {
+	if os.Getenv("SKIP_AIRFLOW_USER_ROLES_TESTS") == "true" {
+		t.Skip("Skipping Airflow Roles and User Tests")
+	}
 	rName := acctest.RandomWithPrefix("tf-acc-test")
 	rNameUpdated := acctest.RandomWithPrefix("tf-acc-test")
 

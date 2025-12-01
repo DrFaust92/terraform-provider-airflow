@@ -74,7 +74,7 @@ func TestAccAirflowConnection_full(t *testing.T) {
 		CheckDestroy: testAccCheckAirflowConnectionCheckDestroy,
 		Steps: []resource.TestStep{
 			{
-				Config: testAccAirflowConnectionConfigFull(rName, rName, 443),
+				Config: testAccAirflowConnectionConfigFull(rName, rName, "test", 443),
 				Check: resource.ComposeTestCheckFunc(
 					resource.TestCheckResourceAttr(resourceName, "connection_id", rName),
 					resource.TestCheckResourceAttr(resourceName, "conn_type", "http"),
@@ -83,7 +83,7 @@ func TestAccAirflowConnection_full(t *testing.T) {
 					resource.TestCheckResourceAttr(resourceName, "login", rName),
 					resource.TestCheckResourceAttr(resourceName, "schema", rName),
 					resource.TestCheckResourceAttr(resourceName, "port", "443"),
-					resource.TestCheckResourceAttr(resourceName, "extra", rName),
+					resource.TestCheckResourceAttr(resourceName, "extra", fmt.Sprintf("{\"%s\":\"%s\"}", "test", "test")),
 					resource.TestCheckResourceAttr(resourceName, "password", rName),
 				),
 			},
@@ -91,10 +91,10 @@ func TestAccAirflowConnection_full(t *testing.T) {
 				ResourceName:            resourceName,
 				ImportState:             true,
 				ImportStateVerify:       true,
-				ImportStateVerifyIgnore: []string{"password"},
+				ImportStateVerifyIgnore: []string{"password", "extra"},
 			},
 			{
-				Config: testAccAirflowConnectionConfigFull(rName, rNameUpdated, 80),
+				Config: testAccAirflowConnectionConfigFull(rName, rNameUpdated, "test2", 80),
 				Check: resource.ComposeTestCheckFunc(
 					resource.TestCheckResourceAttr(resourceName, "connection_id", rName),
 					resource.TestCheckResourceAttr(resourceName, "conn_type", "http"),
@@ -102,7 +102,7 @@ func TestAccAirflowConnection_full(t *testing.T) {
 					resource.TestCheckResourceAttr(resourceName, "login", rNameUpdated),
 					resource.TestCheckResourceAttr(resourceName, "schema", rNameUpdated),
 					resource.TestCheckResourceAttr(resourceName, "port", "80"),
-					resource.TestCheckResourceAttr(resourceName, "extra", rNameUpdated),
+					resource.TestCheckResourceAttr(resourceName, "extra", fmt.Sprintf("{\"%s\":\"%s\"}", "test2", "test2")),
 					resource.TestCheckResourceAttr(resourceName, "password", rNameUpdated),
 					resource.TestCheckResourceAttr(resourceName, "description", rNameUpdated),
 				),
@@ -156,7 +156,7 @@ resource "airflow_connection" "test" {
 `, rName)
 }
 
-func testAccAirflowConnectionConfigFull(rName, rName2 string, port int) string {
+func testAccAirflowConnectionConfigFull(rName, rName2, extra string, port int) string {
 	return fmt.Sprintf(`
 resource "airflow_connection" "test" {
   connection_id = %[1]q
@@ -165,11 +165,11 @@ resource "airflow_connection" "test" {
   description   = %[2]q  
   login         = %[2]q
   schema        = %[2]q
-  port          = %[3]d
+  port          = %[4]d
   password      = %[2]q
-  extra         = %[2]q
+  extra         = jsonencode({ %[3]q = %[3]q })
 }
-`, rName, rName2, port)
+`, rName, rName2, extra, port)
 }
 
 func testAccAirflowConnectionConfigPasswordWO(rName, password string, passwordVersion int) string {
