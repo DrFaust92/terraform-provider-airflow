@@ -121,6 +121,7 @@ curl -X POST https://airflow-server.net/auth/token \
     "username": "user",
     "password": "password"
   }'
+```
 
 ## Argument Reference
 
