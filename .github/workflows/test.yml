@@ -48,7 +48,9 @@ jobs:
         run: |
           echo "AIRFLOW_BASE_ENDPOINT=http://localhost:8080" >> $GITHUB_ENV
           echo "SKIP_AIRFLOW_DAG_TESTS=true" >> $GITHUB_ENV
+          echo "SKIP_AIRFLOW_USER_ROLES_TESTS=true" >> $GITHUB_ENV
           echo "AIRFLOW_API_BASE_PATH=/api/v2" >> $GITHUB_ENV
+
 
       - name: Obtain Airflow JWT token
         run: |
@@ -118,8 +120,6 @@ jobs:
           echo "AIRFLOW_API_USERNAME=admin" >> $GITHUB_ENV
           echo "AIRFLOW_API_PASSWORD=admin" >> $GITHUB_ENV
           echo "SKIP_AIRFLOW_DAG_TESTS=true" >> $GITHUB_ENV
-          echo "AIRFLOW_SKIP_USER_ROLES_TESTS=true" >> $GITHUB_ENV
-
 
       - name: Port forward Airflow webserver
         run: |

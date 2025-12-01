@@ -11,7 +11,7 @@ import (
 )
 
 func TestAccAirflowRole_basic(t *testing.T) {
-	if os.Getenv("AIRFLOW_SKIP_USER_ROLES_TESTS") == "true" {
+	if os.Getenv("SKIP_AIRFLOW_USER_ROLES_TESTS") == "true" {
 		t.Skip("Skipping Airflow Roles and User Tests")
 	}
 	rName := acctest.RandomWithPrefix("tf-acc-test")
