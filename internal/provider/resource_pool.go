@@ -157,6 +157,8 @@ func resourcePoolUpdate(ctx context.Context, d *schema.ResourceData, m interface
 
 	if description, ok := d.GetOk("description"); ok {
 		pool.SetDescription(description.(string))
+	} else {
+		pool.SetDescriptionNil()
 	}
 
 	_, _, err := client.PoolApi.PatchPool(pcfg.AuthContext, name).Pool(pool).Execute()
