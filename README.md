@@ -110,6 +110,40 @@ provider "airflow" {
 }
 ```
 
+### AWS MWAA (Managed Workflows for Apache Airflow) Example
+
+For AWS MWAA environments, you need to use OAuth2 token authentication. The token can be generated using the AWS CLI:
+
+```bash
+aws mwaa create-web-login-token \
+  --name YOUR_MWAA_ENVIRONMENT_NAME \
+  --region us-east-1 \
+  --query 'WebToken' \
+  --output text
+```
+
+Then configure the provider:
+
+```terraform
+data "external" "mwaa_token" {
+  program = ["bash", "-c", <<-EOT
+    aws mwaa create-web-login-token \
+      --name my-mwaa-environment \
+      --region us-east-1 \
+      --query 'WebToken' \
+      --output text | jq -R '{token: .}'
+  EOT
+  ]
+}
+
+provider "airflow" {
+  base_endpoint = "https://YOUR-ENVIRONMENT-ID.c65.airflow.REGION.on.aws"
+  oauth2_token  = data.external.mwaa_token.result.token
+}
+```
+
+For more details on MWAA authentication, see the [AWS documentation](https://docs.aws.amazon.com/mwaa/latest/userguide/access-mwaa-apache-airflow-rest-api.html).
+
 ### Airflow V3 (API v2)
 
 In Airflow v3 (API v2) you cannot use basic auth directly anymore, you have to use OAUTH2 identity token. it can be generated via a user/password for a temporary jwt via:
