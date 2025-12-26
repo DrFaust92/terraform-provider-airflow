@@ -55,7 +55,10 @@ func resourceVariableCreate(ctx context.Context, d *schema.ResourceData, m inter
 
 	_, res, err := varApi.PostVariables(pcfg.AuthContext).Variable(variableReq).Execute()
 	if err != nil {
-		return diag.Errorf("failed to create variable `%s`, Status: `%s` from Airflow: %s", key, res.Status, err)
+		if res != nil {
+			return diag.Errorf("failed to create variable `%s`, Status: `%s` from Airflow: %s", key, res.Status, err)
+		}
+		return diag.Errorf("failed to create variable `%s` from Airflow: %s", key, err)
 	}
 	d.SetId(key)
 
@@ -72,7 +75,10 @@ func resourceVariableRead(ctx context.Context, d *schema.ResourceData, m interfa
 		return nil
 	}
 	if err != nil {
-		return diag.Errorf("failed to get variable `%s`, Status: `%s` from Airflow: %s", d.Id(), resp.Status, err)
+		if resp != nil {
+			return diag.Errorf("failed to get variable `%s`, Status: `%s` from Airflow: %s", d.Id(), resp.Status, err)
+		}
+		return diag.Errorf("failed to get variable `%s` from Airflow: %s", d.Id(), err)
 	}
 
 	if err := d.Set("key", variable.Key); err != nil {
@@ -108,7 +114,10 @@ func resourceVariableUpdate(ctx context.Context, d *schema.ResourceData, m inter
 
 	_, resp, err := client.VariableApi.PatchVariable(pcfg.AuthContext, key).Variable(variableReq).Execute()
 	if err != nil {
-		return diag.Errorf("failed to update variable `%s`, Status: `%s` from Airflow: %s", key, resp.Status, err)
+		if resp != nil {
+			return diag.Errorf("failed to update variable `%s`, Status: `%s` from Airflow: %s", key, resp.Status, err)
+		}
+		return diag.Errorf("failed to update variable `%s` from Airflow: %s", key, err)
 	}
 
 	return resourceVariableRead(ctx, d, m)
@@ -120,7 +129,10 @@ func resourceVariableDelete(ctx context.Context, d *schema.ResourceData, m inter
 
 	resp, err := client.VariableApi.DeleteVariable(pcfg.AuthContext, d.Id()).Execute()
 	if err != nil {
-		return diag.Errorf("failed to delete variable `%s`, Status: `%s` from Airflow: %s", d.Id(), resp.Status, err)
+		if resp != nil {
+			return diag.Errorf("failed to delete variable `%s`, Status: `%s` from Airflow: %s", d.Id(), resp.Status, err)
+		}
+		return diag.Errorf("failed to delete variable `%s` from Airflow: %s", d.Id(), err)
 	}
 
 	if resp != nil && resp.StatusCode == 404 {

@@ -70,8 +70,11 @@ func resourceDagUpdate(ctx context.Context, d *schema.ResourceData, m interface{
 	dag.SetIsPaused(d.Get("is_paused").(bool))
 
 	_, res, err := dagApi.PatchDag(pcfg.AuthContext, dagId).DAG(dag).Execute()
-	if res.StatusCode != 200 {
+	if err != nil {
 		return diag.Errorf("failed to update DAG `%s` from Airflow: %s", dagId, err)
+	}
+	if res != nil && res.StatusCode != 200 {
+		return diag.Errorf("failed to update DAG `%s`, received non-200 status code: %d", dagId, res.StatusCode)
 	}
 	d.SetId(dagId)
 
@@ -87,8 +90,11 @@ func resourceDagRead(ctx context.Context, d *schema.ResourceData, m interface{})
 		d.SetId("")
 		return nil
 	}
-	if resp.StatusCode != 200 {
+	if err != nil {
 		return diag.Errorf("failed to get DAG `%s` from Airflow: %s", d.Id(), err)
+	}
+	if resp != nil && resp.StatusCode != 200 {
+		return diag.Errorf("failed to get DAG `%s`, received non-200 status code: %d", d.Id(), resp.StatusCode)
 	}
 
 	if err := d.Set("dag_id", DAG.DagId); err != nil {
