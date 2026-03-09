@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/apache/airflow-client-go/airflow"
+	"github.com/hashicorp/go-cty/cty"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
@@ -233,8 +234,16 @@ func resourceConnectionCreate(ctx context.Context, d *schema.ResourceData, m int
 
 	if v, ok := d.GetOk("password"); ok {
 		conn.SetPassword(v.(string))
-	} else if v, ok := d.GetOk("password_wo"); ok {
-		conn.SetPassword(v.(string))
+	} else {
+		woVal, woDiags := d.GetRawConfigAt(cty.GetAttrPath("password_wo"))
+		if woDiags.HasError() {
+			return woDiags
+		}
+		if !woVal.IsNull() && woVal.Type().Equals(cty.String) {
+			if pw := woVal.AsString(); pw != "" {
+				conn.SetPassword(pw)
+			}
+		}
 	}
 
 	if v, ok := d.GetOk("extra"); ok {
@@ -368,8 +377,16 @@ func resourceConnectionUpdate(ctx context.Context, d *schema.ResourceData, m int
 
 	if v, ok := d.GetOk("password"); ok && v.(string) != "" {
 		conn.SetPassword(v.(string))
-	} else if v, ok := d.GetOk("password_wo"); ok && v.(string) != "" {
-		conn.SetPassword(v.(string))
+	} else if d.HasChange("password_wo_version") {
+		woVal, woDiags := d.GetRawConfigAt(cty.GetAttrPath("password_wo"))
+		if woDiags.HasError() {
+			return woDiags
+		}
+		if !woVal.IsNull() && woVal.Type().Equals(cty.String) {
+			if pw := woVal.AsString(); pw != "" {
+				conn.SetPassword(pw)
+			}
+		}
 	}
 
 	if v, ok := d.GetOk("extra"); ok {
