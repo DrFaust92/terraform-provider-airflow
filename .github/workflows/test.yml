@@ -108,10 +108,10 @@ jobs:
             --set createUserJob.applyCustomEnv=false \
             --set migrateDatabaseJob.useHelmHooks=false \
             --set migrateDatabaseJob.applyCustomEnv=false \
-            --set webserver.resources.requests.memory=1Gi \
-            --set webserver.resources.limits.memory=1Gi \
+            --set webserver.resources.requests.memory=2Gi \
+            --set webserver.resources.limits.memory=2Gi \
             --set config.api.auth_backend=airflow.api.auth.backend.basic_auth \
-            --timeout 3m \
+            --timeout 5m \
             --wait
 
       - name: Set Airflow environment variable
