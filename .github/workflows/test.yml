@@ -74,7 +74,7 @@ jobs:
 
       - name: Run integration tests
         run: |
-          make testacc
+          ACCTEST_PARALLELISM=3 make testacc
   testV1:
     runs-on: ubuntu-latest
     steps:
@@ -124,8 +124,15 @@ jobs:
       - name: Port forward Airflow webserver
         run: |
           kubectl port-forward svc/airflow-webserver 8080:8080 &
-          sleep 5
+          for i in {1..30}; do
+            if curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/health | grep -q "200"; then
+              echo "Airflow is ready"
+              break
+            fi
+            echo "Waiting for Airflow... ($i/30)"
+            sleep 3
+          done
 
       - name: Run integration tests
         run: |
-          make testacc
+          ACCTEST_PARALLELISM=3 make testacc
