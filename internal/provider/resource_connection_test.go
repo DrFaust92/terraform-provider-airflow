@@ -49,6 +49,7 @@ func TestAccAirflowConnection_passwordWO(t *testing.T) {
 					resource.TestCheckResourceAttr(resourceName, "connection_id", rName),
 					resource.TestCheckResourceAttr(resourceName, "conn_type", "http"),
 					resource.TestCheckResourceAttr(resourceName, "password_wo_version", "1"),
+					testAccCheckAirflowConnectionPasswordSet(resourceName),
 				),
 			},
 			{
@@ -57,10 +58,29 @@ func TestAccAirflowConnection_passwordWO(t *testing.T) {
 					resource.TestCheckResourceAttr(resourceName, "connection_id", rName),
 					resource.TestCheckResourceAttr(resourceName, "conn_type", "http"),
 					resource.TestCheckResourceAttr(resourceName, "password_wo_version", "2"),
+					testAccCheckAirflowConnectionPasswordSet(resourceName),
 				),
 			},
 		},
 	})
+}
+
+func testAccCheckAirflowConnectionPasswordSet(resourceName string) resource.TestCheckFunc {
+	return func(s *terraform.State) error {
+		rs, ok := s.RootModule().Resources[resourceName]
+		if !ok {
+			return fmt.Errorf("resource not found: %s", resourceName)
+		}
+		client := testAccProvider.Meta().(ProviderConfig)
+		conn, _, err := client.ApiClient.ConnectionApi.GetConnection(client.AuthContext, rs.Primary.ID).Execute()
+		if err != nil {
+			return fmt.Errorf("failed to get connection %s: %s", rs.Primary.ID, err)
+		}
+		if pw := conn.GetPassword(); pw == "" {
+			return fmt.Errorf("expected password to be set on connection %s, got empty string", rs.Primary.ID)
+		}
+		return nil
+	}
 }
 
 func TestAccAirflowConnection_full(t *testing.T) {
