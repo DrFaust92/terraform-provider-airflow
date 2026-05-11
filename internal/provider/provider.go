@@ -67,6 +67,14 @@ func AirflowProvider() *schema.Provider {
 				Description: "Base path for Airflow API endpoints",
 				DefaultFunc: schema.EnvDefaultFunc("AIRFLOW_API_BASE_PATH", "/api/v1"),
 			},
+			"session_cookie": {
+				Type:          schema.TypeString,
+				Optional:      true,
+				Sensitive:     true,
+				Description:   "A session cookie value to use for authentication (sent as Cookie: session=<value>). Useful for AWS MWAA private environments.",
+				DefaultFunc:   schema.EnvDefaultFunc("AIRFLOW_SESSION_COOKIE", nil),
+				ConflictsWith: []string{"oauth2_token", "username", "password"},
+			},
 		},
 		ResourcesMap: map[string]*schema.Resource{
 			"airflow_connection": resourceConnection(),
@@ -130,11 +138,18 @@ func providerConfigure(_ context.Context, d *schema.ResourceData) (interface{}, 
 
 	path := strings.TrimSuffix(u.Path, "/")
 
+	defaultHeaders := map[string]string{}
+	if v, ok := d.GetOk("session_cookie"); ok {
+		defaultHeaders["Cookie"] = fmt.Sprintf("session=%s", v.(string))
+		log.Printf("[DEBUG] Using session cookie authentication")
+	}
+
 	clientConf := &airflow.Configuration{
-		Scheme:     u.Scheme,
-		Host:       u.Host,
-		Debug:      true,
-		HTTPClient: client,
+		Scheme:        u.Scheme,
+		Host:          u.Host,
+		DefaultHeader: defaultHeaders,
+		Debug:         true,
+		HTTPClient:    client,
 		Servers: airflow.ServerConfigurations{
 			{
 				URL:         fmt.Sprint(path, d.Get("base_path").(string)),
