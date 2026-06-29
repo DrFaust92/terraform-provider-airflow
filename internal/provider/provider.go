@@ -80,11 +80,11 @@ func AirflowProvider() *schema.Provider {
 			"airflow_connection": resourceConnection(),
 			"airflow_dag":        resourceDag(),
 			"airflow_dag_run":    resourceDagRun(),
-			"airflow_variable":   resourceVariable(),
 			"airflow_pool":       resourcePool(),
 			"airflow_role":       resourceRole(),
 			"airflow_user":       resourceUser(),
 			"airflow_user_roles": resourceUserRoles(),
+			// airflow_variable is served by the Plugin Framework provider (internal/fwprovider), muxed in main.go.
 		},
 		// ConfigureContextFunc: providerConfigure,
 	}
@@ -97,9 +97,35 @@ func AirflowProvider() *schema.Provider {
 }
 
 func providerConfigure(_ context.Context, d *schema.ResourceData) (interface{}, diag.Diagnostics) {
+	oauth2Token, _ := d.Get("oauth2_token").(string)
+	username, _ := d.Get("username").(string)
+	password, _ := d.Get("password").(string)
+	sessionCookie, _ := d.Get("session_cookie").(string)
+
+	prov, err := NewProviderConfig(
+		d.Get("base_endpoint").(string),
+		oauth2Token,
+		username,
+		password,
+		d.Get("disable_ssl_verification").(bool),
+		d.Get("base_path").(string),
+		sessionCookie,
+	)
+	if err != nil {
+		return nil, diag.FromErr(err)
+	}
+
+	return prov, diag.Diagnostics{}
+}
+
+// NewProviderConfig builds the Airflow API client and auth context from the
+// already-resolved provider configuration values. It is shared by the SDKv2
+// provider (this package) and the Plugin Framework provider (internal/fwprovider)
+// so both code paths construct the client identically.
+func NewProviderConfig(endpoint, oauth2Token, username, password string, disableSSL bool, basePath, sessionCookie string) (ProviderConfig, error) {
 	var transport http.RoundTripper
 
-	if disableSSL := d.Get("disable_ssl_verification").(bool); disableSSL {
+	if disableSSL {
 		transport = &http.Transport{
 			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 		}
@@ -111,36 +137,34 @@ func providerConfigure(_ context.Context, d *schema.ResourceData) (interface{}, 
 		Transport: transport,
 	}
 
-	ctx := context.Background()
-	endpoint := d.Get("base_endpoint").(string)
 	u, err := url.Parse(endpoint)
 	if err != nil {
-		return nil, diag.Errorf("invalid base_endpoint: %s", err)
+		return ProviderConfig{}, fmt.Errorf("invalid base_endpoint: %w", err)
 	}
 
-	if v, ok := d.GetOk("oauth2_token"); ok {
-		ctx = context.WithValue(ctx, airflow.ContextAccessToken, v)
+	ctx := context.Background()
+
+	if oauth2Token != "" {
+		ctx = context.WithValue(ctx, airflow.ContextAccessToken, oauth2Token)
 	}
 
-	if username, ok := d.GetOk("username"); ok {
-		var password interface{}
-		if password, ok = d.GetOk("password"); !ok {
-			return nil, diag.Errorf("found username for basic auth, but password not specified")
+	if username != "" {
+		if password == "" {
+			return ProviderConfig{}, fmt.Errorf("found username for basic auth, but password not specified")
 		}
 		log.Printf("[DEBUG] Using API Basic Auth")
 
-		cred := airflow.BasicAuth{
-			UserName: username.(string),
-			Password: password.(string),
-		}
-		ctx = context.WithValue(ctx, airflow.ContextBasicAuth, cred)
+		ctx = context.WithValue(ctx, airflow.ContextBasicAuth, airflow.BasicAuth{
+			UserName: username,
+			Password: password,
+		})
 	}
 
 	path := strings.TrimSuffix(u.Path, "/")
 
 	defaultHeaders := map[string]string{}
-	if v, ok := d.GetOk("session_cookie"); ok {
-		defaultHeaders["Cookie"] = fmt.Sprintf("session=%s", v.(string))
+	if sessionCookie != "" {
+		defaultHeaders["Cookie"] = fmt.Sprintf("session=%s", sessionCookie)
 		log.Printf("[DEBUG] Using session cookie authentication")
 	}
 
@@ -152,16 +176,14 @@ func providerConfigure(_ context.Context, d *schema.ResourceData) (interface{}, 
 		HTTPClient:    client,
 		Servers: airflow.ServerConfigurations{
 			{
-				URL:         fmt.Sprint(path, d.Get("base_path").(string)),
+				URL:         fmt.Sprint(path, basePath),
 				Description: "Apache Airflow Stable API.",
 			},
 		},
 	}
 
-	prov := ProviderConfig{
+	return ProviderConfig{
 		ApiClient:   airflow.NewAPIClient(clientConf),
 		AuthContext: ctx,
-	}
-
-	return prov, diag.Diagnostics{}
+	}, nil
 }
