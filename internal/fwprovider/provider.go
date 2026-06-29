@@ -43,13 +43,20 @@ func (p *airflowProvider) Metadata(_ context.Context, _ fwprovider.MetadataReque
 }
 
 func (p *airflowProvider) Schema(_ context.Context, _ fwprovider.SchemaRequest, resp *fwprovider.SchemaResponse) {
+	// Mirror SDKv2's EnvDefaultFunc behaviour: a Required attribute whose
+	// DefaultFunc can supply a value is downgraded to Optional at the protocol
+	// level (helper/schema/core_schema.go), which means base_endpoint is
+	// Required when AIRFLOW_BASE_ENDPOINT is unset and Optional when it is set.
+	// The framework schema must track this so the muxed provider schemas stay
+	// identical in every environment. Presence is enforced in Configure.
+	baseEndpoint := schema.StringAttribute{Required: true}
+	if os.Getenv("AIRFLOW_BASE_ENDPOINT") != "" {
+		baseEndpoint = schema.StringAttribute{Optional: true}
+	}
+
 	resp.Schema = schema.Schema{
 		Attributes: map[string]schema.Attribute{
-			// Required to match the SDKv2 provider's protocol schema (an
-			// EnvDefaultFunc with a nil default keeps the attribute Required).
-			"base_endpoint": schema.StringAttribute{
-				Required: true,
-			},
+			"base_endpoint": baseEndpoint,
 			"oauth2_token": schema.StringAttribute{
 				Optional:    true,
 				Sensitive:   true,
