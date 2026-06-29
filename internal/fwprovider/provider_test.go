@@ -35,9 +35,10 @@ var testAccProtoV6ProviderFactories = map[string]func() (tfprotov6.ProviderServe
 	},
 }
 
-// TestMuxServer asserts that the SDKv2 and framework providers can be muxed.
-// NewMuxServer compares the provider schema of every server, so this fails fast
-// if the framework provider schema drifts from the SDKv2 one. Runs without
+// TestMuxServer asserts that the SDKv2 and framework providers can be muxed and
+// expose an identical provider schema. The schema-equality check runs when
+// GetProviderSchema is called (not at NewMuxServer time), so this test invokes
+// it explicitly and fails fast on any provider-schema drift. Runs without
 // TF_ACC.
 func TestMuxServer(t *testing.T) {
 	ctx := context.Background()
@@ -47,11 +48,22 @@ func TestMuxServer(t *testing.T) {
 		t.Fatalf("error upgrading SDKv2 provider: %s", err)
 	}
 
-	if _, err := tf6muxserver.NewMuxServer(ctx,
+	muxServer, err := tf6muxserver.NewMuxServer(ctx,
 		func() tfprotov6.ProviderServer { return upgraded },
 		providerserver.NewProtocol6(New("test")()),
-	); err != nil {
+	)
+	if err != nil {
 		t.Fatalf("error setting up muxed provider: %s", err)
+	}
+
+	schemaResp, err := muxServer.ProviderServer().GetProviderSchema(ctx, &tfprotov6.GetProviderSchemaRequest{})
+	if err != nil {
+		t.Fatalf("error retrieving provider schema: %s", err)
+	}
+	for _, d := range schemaResp.Diagnostics {
+		if d.Severity == tfprotov6.DiagnosticSeverityError {
+			t.Fatalf("provider schema diagnostic error: %s: %s", d.Summary, d.Detail)
+		}
 	}
 }
 

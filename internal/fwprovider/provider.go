@@ -14,6 +14,7 @@ import (
 
 	"github.com/drfaust92/terraform-provider-airflow/internal/provider"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	fwprovider "github.com/hashicorp/terraform-plugin-framework/provider"
 	"github.com/hashicorp/terraform-plugin-framework/provider/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -44,6 +45,8 @@ func (p *airflowProvider) Metadata(_ context.Context, _ fwprovider.MetadataReque
 func (p *airflowProvider) Schema(_ context.Context, _ fwprovider.SchemaRequest, resp *fwprovider.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Attributes: map[string]schema.Attribute{
+			// Required to match the SDKv2 provider's protocol schema (an
+			// EnvDefaultFunc with a nil default keeps the attribute Required).
 			"base_endpoint": schema.StringAttribute{
 				Required: true,
 			},
@@ -104,6 +107,15 @@ func (p *airflowProvider) Configure(_ context.Context, req fwprovider.ConfigureR
 	basePath := stringOrEnv(config.BasePath, "AIRFLOW_API_BASE_PATH", defaultBasePath)
 	sessionCookie := stringOrEnv(config.SessionCookie, "AIRFLOW_SESSION_COOKIE", "")
 	disableSSL := config.DisableSSLVerification.ValueBool()
+
+	if endpoint == "" {
+		resp.Diagnostics.AddAttributeError(
+			path.Root("base_endpoint"),
+			"Missing Airflow API endpoint",
+			"The provider requires base_endpoint to be set, either in the configuration or via the AIRFLOW_BASE_ENDPOINT environment variable.",
+		)
+		return
+	}
 
 	cfg, err := provider.NewProviderConfig(endpoint, oauth2Token, username, password, disableSSL, basePath, sessionCookie)
 	if err != nil {
