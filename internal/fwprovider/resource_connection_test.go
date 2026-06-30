@@ -256,3 +256,41 @@ func TestAccAirflowConnection_upgradeFromSDKv2(t *testing.T) {
 		},
 	})
 }
+
+func testAccAirflowConnectionConfigExtra(rName, extra string) string {
+	return fmt.Sprintf(`
+resource "airflow_connection" "test" {
+  connection_id = %[1]q
+  conn_type     = "http"
+  extra         = %[2]q
+}
+`, rName, extra)
+}
+
+// TestAccAirflowConnection_extraEquivalentJSON verifies that the configured
+// `extra` JSON is preserved verbatim and that a semantically-equivalent but
+// reformatted value (whitespace + key order) produces no diff.
+func TestAccAirflowConnection_extraEquivalentJSON(t *testing.T) {
+	rName := acctest.RandomWithPrefix("tf-acc-test")
+	resourceName := "airflow_connection.test"
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckAirflowConnectionCheckDestroy,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccAirflowConnectionConfigExtra(rName, `{"a":"b","c":"d"}`),
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr(resourceName, "connection_id", rName),
+					resource.TestCheckResourceAttr(resourceName, "extra", `{"a":"b","c":"d"}`),
+				),
+			},
+			{
+				// Same JSON, reformatted (whitespace + key order): must be a no-op.
+				Config:   testAccAirflowConnectionConfigExtra(rName, "{\n  \"c\": \"d\",\n  \"a\": \"b\"\n}"),
+				PlanOnly: true,
+			},
+		},
+	})
+}

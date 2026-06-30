@@ -175,3 +175,32 @@ resource "airflow_pool" "test" {
 }
 `, rName, slots, includeDeferred)
 }
+
+// TestAccAirflowPool_upgradeFromSDKv2 ensures a pool created by the SDKv2
+// provider plans/applies cleanly under the current framework provider.
+func TestAccAirflowPool_upgradeFromSDKv2(t *testing.T) {
+	rName := acctest.RandomWithPrefix("tf-acc-test")
+	resourceName := "airflow_pool.test"
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:     func() { testAccPreCheck(t) },
+		CheckDestroy: testAccCheckAirflowPoolCheckDestroy,
+		Steps: []resource.TestStep{
+			{
+				ExternalProviders: map[string]resource.ExternalProvider{
+					"airflow": {VersionConstraint: "1.0.2", Source: "DrFaust92/airflow"},
+				},
+				Config: testAccAirflowPoolConfigBasic(rName, 2),
+				Check:  resource.TestCheckResourceAttr(resourceName, "name", rName),
+			},
+			{
+				ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+				Config:                   testAccAirflowPoolConfigBasic(rName, 2),
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr(resourceName, "name", rName),
+					resource.TestCheckResourceAttr(resourceName, "slots", "2"),
+				),
+			},
+		},
+	})
+}
