@@ -10,6 +10,7 @@ import (
 
 func resourceRole() *schema.Resource {
 	return &schema.Resource{
+		Description:          "Provides an Airflow role. Note this resource is not supported on Airflow v3 (API v2): the Roles API is not available in Airflow v3.",
 		CreateWithoutTimeout: resourceRoleCreate,
 		ReadWithoutTimeout:   resourceRoleRead,
 		UpdateWithoutTimeout: resourceRoleUpdate,
@@ -19,22 +20,26 @@ func resourceRole() *schema.Resource {
 		},
 		Schema: map[string]*schema.Schema{
 			"name": {
-				Type:     schema.TypeString,
-				Required: true,
-				ForceNew: true,
+				Type:        schema.TypeString,
+				Required:    true,
+				ForceNew:    true,
+				Description: "The name of the role.",
 			},
 			"action": {
-				Type:     schema.TypeSet,
-				Required: true,
+				Type:        schema.TypeSet,
+				Required:    true,
+				Description: "The action struct that defines the role.",
 				Elem: &schema.Resource{
 					Schema: map[string]*schema.Schema{
 						"action": {
-							Type:     schema.TypeString,
-							Required: true,
+							Type:        schema.TypeString,
+							Required:    true,
+							Description: "The name of the permission.",
 						},
 						"resource": {
-							Type:     schema.TypeString,
-							Required: true,
+							Type:        schema.TypeString,
+							Required:    true,
+							Description: "The name of the resource.",
 						},
 					},
 				},

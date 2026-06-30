@@ -14,6 +14,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-mux/tf6muxserver"
 )
 
+//go:generate go run github.com/hashicorp/terraform-plugin-docs/cmd/tfplugindocs generate --provider-name airflow
+
 // version is set at build/release time via ldflags.
 var version = "dev"
 

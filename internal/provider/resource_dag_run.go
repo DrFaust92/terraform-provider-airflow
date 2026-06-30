@@ -14,6 +14,7 @@ import (
 
 func resourceDagRun() *schema.Resource {
 	return &schema.Resource{
+		Description:          "Provides an Airflow dag run resource (triggers a DAG).",
 		CreateContext:        resourceDagRunCreate,
 		ReadWithoutTimeout:   resourceDagRunRead,
 		DeleteWithoutTimeout: resourceDagRunDelete,
@@ -25,25 +26,29 @@ func resourceDagRun() *schema.Resource {
 		},
 		Schema: map[string]*schema.Schema{
 			"dag_id": {
-				Type:     schema.TypeString,
-				Required: true,
-				ForceNew: true,
+				Type:        schema.TypeString,
+				Required:    true,
+				ForceNew:    true,
+				Description: "The DAG ID to run.",
 			},
 			"dag_run_id": {
-				Type:     schema.TypeString,
-				Optional: true,
-				ForceNew: true,
-				Computed: true,
+				Type:        schema.TypeString,
+				Optional:    true,
+				ForceNew:    true,
+				Computed:    true,
+				Description: "The DAG Run ID. If a value is not passed, a random one will be generated based on execution date.",
 			},
 			"conf": {
-				Type:     schema.TypeMap,
-				Optional: true,
-				ForceNew: true,
-				Elem:     &schema.Schema{Type: schema.TypeString},
+				Type:        schema.TypeMap,
+				Optional:    true,
+				ForceNew:    true,
+				Elem:        &schema.Schema{Type: schema.TypeString},
+				Description: "A map describing additional configuration parameters.",
 			},
 			"state": {
-				Type:     schema.TypeString,
-				Computed: true,
+				Type:        schema.TypeString,
+				Computed:    true,
+				Description: "The DAG state.",
 			},
 		},
 	}

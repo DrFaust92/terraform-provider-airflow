@@ -10,6 +10,7 @@ import (
 
 func resourceDag() *schema.Resource {
 	return &schema.Resource{
+		Description:          "Provides an Airflow DAG. This resource adopts an existing DAG and does not create one; on delete, the DAG is only removed from state and not actually deleted (unless `delete_dag` is set).",
 		CreateWithoutTimeout: resourceDagUpdate,
 		ReadWithoutTimeout:   resourceDagRead,
 		UpdateWithoutTimeout: resourceDagUpdate,
@@ -19,42 +20,51 @@ func resourceDag() *schema.Resource {
 		},
 		Schema: map[string]*schema.Schema{
 			"dag_id": {
-				Type:     schema.TypeString,
-				Required: true,
-				ForceNew: true,
+				Type:        schema.TypeString,
+				Required:    true,
+				ForceNew:    true,
+				Description: "The ID of the DAG.",
 			},
 			"description": {
-				Type:     schema.TypeString,
-				Computed: true,
+				Type:        schema.TypeString,
+				Computed:    true,
+				Description: "User-provided DAG description, which can consist of several sentences or paragraphs that describe DAG contents.",
 			},
 			"delete_dag": {
-				Type:     schema.TypeBool,
-				Optional: true,
-				Default:  false,
+				Type:        schema.TypeBool,
+				Optional:    true,
+				Default:     false,
+				Description: "Whether to delete the DAG when deleted from Terraform.",
 			},
 			"file_token": {
-				Type:     schema.TypeString,
-				Computed: true,
+				Type:        schema.TypeString,
+				Computed:    true,
+				Description: "The key containing the encrypted path to the file. Encryption and decryption take place only on the server. This prevents the client from reading a non-DAG file.",
 			},
 			"fileloc": {
-				Type:     schema.TypeString,
-				Computed: true,
+				Type:        schema.TypeString,
+				Computed:    true,
+				Description: "The absolute path to the file.",
 			},
 			"is_active": {
-				Type:     schema.TypeBool,
-				Computed: true,
+				Type:        schema.TypeBool,
+				Computed:    true,
+				Description: "Whether the DAG is currently seen by the scheduler(s).",
 			},
 			"is_paused": {
-				Type:     schema.TypeBool,
-				Required: true,
+				Type:        schema.TypeBool,
+				Required:    true,
+				Description: "Whether the DAG is paused.",
 			},
 			"is_subdag": {
-				Type:     schema.TypeBool,
-				Computed: true,
+				Type:        schema.TypeBool,
+				Computed:    true,
+				Description: "Whether the DAG is a SubDAG.",
 			},
 			"root_dag_id": {
-				Type:     schema.TypeString,
-				Computed: true,
+				Type:        schema.TypeString,
+				Computed:    true,
+				Description: "If the DAG is a SubDAG then it is the top level DAG identifier. Otherwise, null.",
 			},
 		},
 	}

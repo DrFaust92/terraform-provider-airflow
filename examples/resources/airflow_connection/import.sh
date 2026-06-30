@@ -1,0 +1,1 @@
+terraform import airflow_connection.example example

@@ -10,6 +10,7 @@ import (
 
 func resourceUserRoles() *schema.Resource {
 	return &schema.Resource{
+		Description:          "Provides an Airflow user roles management. Note this resource is not supported on Airflow v3 (API v2): the User Roles API is not available in Airflow v3.",
 		CreateWithoutTimeout: resourceUserRolesCreate,
 		ReadWithoutTimeout:   resourceUserRolesRead,
 		UpdateWithoutTimeout: resourceUserRolesUpdate,
@@ -19,15 +20,17 @@ func resourceUserRoles() *schema.Resource {
 		},
 		Schema: map[string]*schema.Schema{
 			"roles": {
-				Type:     schema.TypeSet,
-				Required: true,
-				MinItems: 1,
-				Elem:     &schema.Schema{Type: schema.TypeString},
+				Type:        schema.TypeSet,
+				Required:    true,
+				MinItems:    1,
+				Description: "A set of User roles to attach to the User.",
+				Elem:        &schema.Schema{Type: schema.TypeString},
 			},
 			"username": {
-				Type:     schema.TypeString,
-				Required: true,
-				ForceNew: true,
+				Type:        schema.TypeString,
+				Required:    true,
+				ForceNew:    true,
+				Description: "The username.",
 			},
 		},
 	}
