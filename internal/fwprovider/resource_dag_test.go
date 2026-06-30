@@ -1,4 +1,4 @@
-package provider
+package fwprovider
 
 import (
 	"fmt"
@@ -6,8 +6,8 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/terraform"
+	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/hashicorp/terraform-plugin-testing/terraform"
 )
 
 func TestAccAirflowDag_basic(t *testing.T) {
@@ -17,9 +17,9 @@ func TestAccAirflowDag_basic(t *testing.T) {
 
 	resourceName := "airflow_dag.test"
 	resource.Test(t, resource.TestCase{
-		PreCheck:     func() { testAccPreCheck(t) },
-		Providers:    testAccProviders,
-		CheckDestroy: testAccCheckAirflowDagCheckDestroy,
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckAirflowDagCheckDestroy,
 		Steps: []resource.TestStep{
 			{
 				Config: testAccAirflowDagConfigBasic(true),
@@ -59,19 +59,22 @@ func TestAccAirflowDag_basic(t *testing.T) {
 }
 
 func testAccCheckAirflowDagCheckDestroy(s *terraform.State) error {
-	client := testAccProvider.Meta().(ProviderConfig)
+	cfg, err := testAccProviderConfig()
+	if err != nil {
+		return err
+	}
 
 	for _, rs := range s.RootModule().Resources {
 		if rs.Type != "airflow_dag" {
 			continue
 		}
 
-		dag, res, err := client.ApiClient.DAGApi.GetDag(client.AuthContext, rs.Primary.ID).Execute()
+		dag, res, err := cfg.ApiClient.DAGApi.GetDag(cfg.AuthContext, rs.Primary.ID).Execute()
 		if err == nil {
 			deleteDag, _ := strconv.ParseBool(rs.Primary.Attributes["delete_dag"])
 
 			if deleteDag {
-				if *dag.DagId == rs.Primary.ID {
+				if dag.GetDagId() == rs.Primary.ID {
 					return fmt.Errorf("Airflow Dag (%s) still exists.", rs.Primary.ID)
 				}
 			}

@@ -36,7 +36,7 @@ resource "airflow_dag" "example" {
 - `description` (String) User-provided DAG description, which can consist of several sentences or paragraphs that describe DAG contents.
 - `file_token` (String) The key containing the encrypted path to the file. Encryption and decryption take place only on the server. This prevents the client from reading a non-DAG file.
 - `fileloc` (String) The absolute path to the file.
-- `id` (String) The ID of this resource.
+- `id` (String) The DAG ID.
 - `is_active` (Boolean) Whether the DAG is currently seen by the scheduler(s).
 - `is_subdag` (Boolean) Whether the DAG is a SubDAG.
 - `root_dag_id` (String) If the DAG is a SubDAG then it is the top level DAG identifier. Otherwise, null.
