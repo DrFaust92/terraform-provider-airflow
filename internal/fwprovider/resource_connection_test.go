@@ -137,16 +137,19 @@ func TestAccAirflowConnection_full(t *testing.T) {
 				),
 			},
 			{
+				// Removing the optional fields clears them. Under the framework
+				// these become null (absent) rather than the SDKv2 zero values,
+				// so assert their absence.
 				Config: testAccAirflowConnectionConfigBasic(rName),
 				Check: resource.ComposeTestCheckFunc(
 					resource.TestCheckResourceAttr(resourceName, "connection_id", rName),
 					resource.TestCheckResourceAttr(resourceName, "conn_type", "http"),
-					resource.TestCheckResourceAttr(resourceName, "extra", ""),
-					resource.TestCheckResourceAttr(resourceName, "description", ""),
-					resource.TestCheckResourceAttr(resourceName, "port", "0"),
-					resource.TestCheckResourceAttr(resourceName, "schema", ""),
-					resource.TestCheckResourceAttr(resourceName, "login", ""),
-					resource.TestCheckResourceAttr(resourceName, "host", ""),
+					resource.TestCheckNoResourceAttr(resourceName, "extra"),
+					resource.TestCheckNoResourceAttr(resourceName, "description"),
+					resource.TestCheckNoResourceAttr(resourceName, "port"),
+					resource.TestCheckNoResourceAttr(resourceName, "schema"),
+					resource.TestCheckNoResourceAttr(resourceName, "login"),
+					resource.TestCheckNoResourceAttr(resourceName, "host"),
 				),
 			},
 		},
