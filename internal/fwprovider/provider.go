@@ -138,6 +138,7 @@ func (p *airflowProvider) Resources(_ context.Context) []func() resource.Resourc
 	return []func() resource.Resource{
 		newVariableResource,
 		newPoolResource,
+		newRoleResource,
 	}
 }
 
