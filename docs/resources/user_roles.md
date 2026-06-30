@@ -29,7 +29,7 @@ resource "airflow_user_roles" "example" {
 
 ### Read-Only
 
-- `id` (String) The ID of this resource.
+- `id` (String) The username.
 
 ## Import
 
