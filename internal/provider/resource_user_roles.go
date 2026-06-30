@@ -131,3 +131,35 @@ func resourceUserRolesDelete(ctx context.Context, d *schema.ResourceData, m inte
 
 	return nil
 }
+
+func expandAirflowUserRoles(tfList *schema.Set) []airflow.UserCollectionItemRoles {
+	if tfList.Len() == 0 {
+		return nil
+	}
+
+	apiObjects := make([]airflow.UserCollectionItemRoles, 0)
+
+	for _, tfMapRaw := range tfList.List() {
+		val, ok := tfMapRaw.(string)
+
+		if !ok {
+			continue
+		}
+
+		apiObject := airflow.UserCollectionItemRoles{
+			Name: &val,
+		}
+		apiObjects = append(apiObjects, apiObject)
+	}
+
+	return apiObjects
+}
+
+func flattenAirflowUserRoles(apiObjects []airflow.UserCollectionItemRoles) []string {
+	vs := make([]string, 0, len(apiObjects))
+	for _, v := range apiObjects {
+		name := *v.Name
+		vs = append(vs, name)
+	}
+	return vs
+}
