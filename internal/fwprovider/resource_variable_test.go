@@ -147,3 +147,33 @@ resource "airflow_variable" "test" {
 }
 `, rName, value)
 }
+
+// TestAccAirflowVariable_upgradeFromSDKv2 ensures a variable created by the
+// SDKv2 provider plans/applies cleanly under the current framework provider
+// (guards the SDKv2 "" -> framework null state-representation upgrade path).
+func TestAccAirflowVariable_upgradeFromSDKv2(t *testing.T) {
+	rName := acctest.RandomWithPrefix("tf-acc-test")
+	resourceName := "airflow_variable.test"
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:     func() { testAccPreCheck(t) },
+		CheckDestroy: testAccCheckAirflowVariableCheckDestroy,
+		Steps: []resource.TestStep{
+			{
+				ExternalProviders: map[string]resource.ExternalProvider{
+					"airflow": {VersionConstraint: "1.0.2", Source: "DrFaust92/airflow"},
+				},
+				Config: testAccAirflowVariableConfigBasic(rName, rName),
+				Check:  resource.TestCheckResourceAttr(resourceName, "key", rName),
+			},
+			{
+				ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+				Config:                   testAccAirflowVariableConfigBasic(rName, rName),
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr(resourceName, "key", rName),
+					resource.TestCheckResourceAttr(resourceName, "value", rName),
+				),
+			},
+		},
+	})
+}

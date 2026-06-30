@@ -217,3 +217,80 @@ resource "airflow_connection" "test" {
 }
 `, rName, password, passwordVersion)
 }
+
+// TestAccAirflowConnection_upgradeFromSDKv2 reproduces the regression where a
+// connection created by the SDKv2 provider (which stored an unset `extra` as "")
+// failed under the framework provider with "Invalid JSON String Value". Step 1
+// creates the connection with the last SDKv2 release; step 2 applies it with the
+// current (framework) provider and must succeed and converge to a stable plan.
+func TestAccAirflowConnection_upgradeFromSDKv2(t *testing.T) {
+	rName := acctest.RandomWithPrefix("tf-acc-test")
+	resourceName := "airflow_connection.test"
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:     func() { testAccPreCheck(t) },
+		CheckDestroy: testAccCheckAirflowConnectionCheckDestroy,
+		Steps: []resource.TestStep{
+			{
+				ExternalProviders: map[string]resource.ExternalProvider{
+					"airflow": {VersionConstraint: "1.0.2", Source: "DrFaust92/airflow"},
+				},
+				Config: testAccAirflowConnectionConfigBasic(rName),
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr(resourceName, "connection_id", rName),
+				),
+			},
+			{
+				// Plan + apply with the current (framework) provider. Previously
+				// this errored with "Invalid JSON String Value" while reading the
+				// SDKv2-written extra="". It now applies (normalizing the SDKv2
+				// ""/0 representations of unset optionals to null) and the
+				// built-in post-apply plan check confirms it converges.
+				ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+				Config:                   testAccAirflowConnectionConfigBasic(rName),
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr(resourceName, "connection_id", rName),
+					resource.TestCheckResourceAttr(resourceName, "conn_type", "http"),
+				),
+			},
+		},
+	})
+}
+
+func testAccAirflowConnectionConfigExtra(rName, extra string) string {
+	return fmt.Sprintf(`
+resource "airflow_connection" "test" {
+  connection_id = %[1]q
+  conn_type     = "http"
+  extra         = %[2]q
+}
+`, rName, extra)
+}
+
+// TestAccAirflowConnection_extraEquivalentJSON verifies that the configured
+// `extra` JSON is preserved verbatim and that a semantically-equivalent but
+// reformatted value (whitespace + key order) produces no diff.
+func TestAccAirflowConnection_extraEquivalentJSON(t *testing.T) {
+	rName := acctest.RandomWithPrefix("tf-acc-test")
+	resourceName := "airflow_connection.test"
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckAirflowConnectionCheckDestroy,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccAirflowConnectionConfigExtra(rName, `{"a":"b","c":"d"}`),
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr(resourceName, "connection_id", rName),
+					resource.TestCheckResourceAttr(resourceName, "extra", `{"a":"b","c":"d"}`),
+				),
+			},
+			{
+				// Same JSON, reformatted (whitespace + key order): must be a no-op.
+				Config:   testAccAirflowConnectionConfigExtra(rName, "{\n  \"c\": \"d\",\n  \"a\": \"b\"\n}"),
+				PlanOnly: true,
+			},
+		},
+	})
+}
