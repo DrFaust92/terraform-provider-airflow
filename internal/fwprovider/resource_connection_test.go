@@ -217,3 +217,34 @@ resource "airflow_connection" "test" {
 }
 `, rName, password, passwordVersion)
 }
+
+// TestAccAirflowConnection_upgradeFromSDKv2 reproduces the regression where a
+// connection created by the SDKv2 provider (which stored an unset `extra` as "")
+// failed under the framework provider with "Invalid JSON String Value". Step 1
+// creates the connection with the last SDKv2 release; step 2 plans it with the
+// current (framework) provider and asserts an empty, error-free plan.
+func TestAccAirflowConnection_upgradeFromSDKv2(t *testing.T) {
+	rName := acctest.RandomWithPrefix("tf-acc-test")
+	resourceName := "airflow_connection.test"
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:     func() { testAccPreCheck(t) },
+		CheckDestroy: testAccCheckAirflowConnectionCheckDestroy,
+		Steps: []resource.TestStep{
+			{
+				ExternalProviders: map[string]resource.ExternalProvider{
+					"airflow": {VersionConstraint: "1.0.2", Source: "DrFaust92/airflow"},
+				},
+				Config: testAccAirflowConnectionConfigBasic(rName),
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr(resourceName, "connection_id", rName),
+				),
+			},
+			{
+				ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+				Config:                   testAccAirflowConnectionConfigBasic(rName),
+				PlanOnly:                 true,
+			},
+		},
+	})
+}

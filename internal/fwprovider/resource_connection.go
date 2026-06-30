@@ -2,13 +2,14 @@ package fwprovider
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
+	"reflect"
 	"strings"
 
 	"github.com/apache/airflow-client-go/airflow"
 	"github.com/drfaust92/terraform-provider-airflow/internal/client"
-	"github.com/hashicorp/terraform-plugin-framework-jsontypes/jsontypes"
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -37,18 +38,18 @@ type connectionResource struct {
 }
 
 type connectionResourceModel struct {
-	ID                types.String         `tfsdk:"id"`
-	ConnectionID      types.String         `tfsdk:"connection_id"`
-	ConnType          types.String         `tfsdk:"conn_type"`
-	Description       types.String         `tfsdk:"description"`
-	Host              types.String         `tfsdk:"host"`
-	Login             types.String         `tfsdk:"login"`
-	Schema            types.String         `tfsdk:"schema"`
-	Port              types.Int64          `tfsdk:"port"`
-	Password          types.String         `tfsdk:"password"`
-	PasswordWO        types.String         `tfsdk:"password_wo"`
-	PasswordWOVersion types.String         `tfsdk:"password_wo_version"`
-	Extra             jsontypes.Normalized `tfsdk:"extra"`
+	ID                types.String `tfsdk:"id"`
+	ConnectionID      types.String `tfsdk:"connection_id"`
+	ConnType          types.String `tfsdk:"conn_type"`
+	Description       types.String `tfsdk:"description"`
+	Host              types.String `tfsdk:"host"`
+	Login             types.String `tfsdk:"login"`
+	Schema            types.String `tfsdk:"schema"`
+	Port              types.Int64  `tfsdk:"port"`
+	Password          types.String `tfsdk:"password"`
+	PasswordWO        types.String `tfsdk:"password_wo"`
+	PasswordWOVersion types.String `tfsdk:"password_wo_version"`
+	Extra             types.String `tfsdk:"extra"`
 }
 
 func (r *connectionResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -128,7 +129,9 @@ func (r *connectionResource) Schema(_ context.Context, _ resource.SchemaRequest,
 				MarkdownDescription: "Other values that cannot be put into another field, e.g. RSA keys.",
 				Optional:            true,
 				Sensitive:           true,
-				CustomType:          jsontypes.NormalizedType{},
+				PlanModifiers: []planmodifier.String{
+					suppressEquivalentJSON{},
+				},
 			},
 		},
 	}
@@ -366,9 +369,9 @@ func (r *connectionResource) readInto(m *connectionResourceModel, diags *diag.Di
 	}
 
 	if e := conn.GetExtra(); e != "" {
-		m.Extra = jsontypes.NewNormalizedValue(e)
+		m.Extra = types.StringValue(e)
 	} else if !m.Extra.IsNull() {
-		m.Extra = jsontypes.NewNormalizedNull()
+		m.Extra = types.StringValue("")
 	}
 
 	// Preserve the configured password unless the API returns a real
@@ -390,5 +393,41 @@ func setOptionalString(attr *types.String, apiValue string) {
 		*attr = types.StringValue(apiValue)
 	} else if !attr.IsNull() {
 		*attr = types.StringValue("")
+	}
+}
+
+// suppressEquivalentJSON is a plan modifier for the connection `extra`
+// attribute. It suppresses diffs when the prior state and the configured value
+// are both valid JSON and semantically equal (ignoring formatting/key order).
+// Crucially it does NOT validate the value: `extra` may be empty or non-JSON
+// (e.g. when migrating state written by the SDKv2 provider, which stored an
+// unset extra as ""), so non-JSON values are left untouched rather than rejected.
+type suppressEquivalentJSON struct{}
+
+func (m suppressEquivalentJSON) Description(_ context.Context) string {
+	return "Suppress diffs between semantically-equivalent JSON extra values."
+}
+
+func (m suppressEquivalentJSON) MarkdownDescription(ctx context.Context) string {
+	return m.Description(ctx)
+}
+
+func (m suppressEquivalentJSON) PlanModifyString(_ context.Context, req planmodifier.StringRequest, resp *planmodifier.StringResponse) {
+	if req.StateValue.IsNull() || req.PlanValue.IsNull() || req.PlanValue.IsUnknown() {
+		return
+	}
+
+	oldVal, newVal := req.StateValue.ValueString(), req.PlanValue.ValueString()
+	if oldVal == newVal {
+		return
+	}
+
+	var oldJSON, newJSON interface{}
+	if json.Unmarshal([]byte(oldVal), &oldJSON) != nil || json.Unmarshal([]byte(newVal), &newJSON) != nil {
+		// Not both valid JSON: keep the normal string diff.
+		return
+	}
+	if reflect.DeepEqual(oldJSON, newJSON) {
+		resp.PlanValue = req.StateValue
 	}
 }
