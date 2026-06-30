@@ -1,12 +1,12 @@
-package provider
+package fwprovider
 
 import (
 	"fmt"
 	"testing"
 
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/acctest"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/terraform"
+	"github.com/hashicorp/terraform-plugin-testing/helper/acctest"
+	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/hashicorp/terraform-plugin-testing/terraform"
 )
 
 func TestAccAirflowPool_basic(t *testing.T) {
@@ -14,9 +14,9 @@ func TestAccAirflowPool_basic(t *testing.T) {
 
 	resourceName := "airflow_pool.test"
 	resource.Test(t, resource.TestCase{
-		PreCheck:     func() { testAccPreCheck(t) },
-		Providers:    testAccProviders,
-		CheckDestroy: testAccCheckAirflowPoolCheckDestroy,
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckAirflowPoolCheckDestroy,
 		Steps: []resource.TestStep{
 			{
 				Config: testAccAirflowPoolConfigBasic(rName, 2),
@@ -60,9 +60,9 @@ func TestAccAirflowPool_description(t *testing.T) {
 
 	resourceName := "airflow_pool.test"
 	resource.Test(t, resource.TestCase{
-		PreCheck:     func() { testAccPreCheck(t) },
-		Providers:    testAccProviders,
-		CheckDestroy: testAccCheckAirflowPoolCheckDestroy,
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckAirflowPoolCheckDestroy,
 		Steps: []resource.TestStep{
 			{
 				Config: testAccAirflowPoolConfigDescription(rName, 2, "Test description"),
@@ -89,9 +89,9 @@ func TestAccAirflowPool_include_deferred(t *testing.T) {
 
 	resourceName := "airflow_pool.test"
 	resource.Test(t, resource.TestCase{
-		PreCheck:     func() { testAccPreCheck(t) },
-		Providers:    testAccProviders,
-		CheckDestroy: testAccCheckAirflowPoolCheckDestroy,
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckAirflowPoolCheckDestroy,
 		Steps: []resource.TestStep{
 			{
 				Config: testAccAirflowPoolConfigIncludeDeferred(rName, 2, true),
@@ -122,16 +122,19 @@ func TestAccAirflowPool_include_deferred(t *testing.T) {
 }
 
 func testAccCheckAirflowPoolCheckDestroy(s *terraform.State) error {
-	client := testAccProvider.Meta().(ProviderConfig)
+	cfg, err := testAccProviderConfig()
+	if err != nil {
+		return err
+	}
 
 	for _, rs := range s.RootModule().Resources {
 		if rs.Type != "airflow_pool" {
 			continue
 		}
 
-		variable, res, err := client.ApiClient.PoolApi.GetPool(client.AuthContext, rs.Primary.ID).Execute()
+		pool, res, err := cfg.ApiClient.PoolApi.GetPool(cfg.AuthContext, rs.Primary.ID).Execute()
 		if err == nil {
-			if *variable.Name == rs.Primary.ID {
+			if pool.GetName() == rs.Primary.ID {
 				return fmt.Errorf("Airflow Pool (%s) still exists.", rs.Primary.ID)
 			}
 		}
