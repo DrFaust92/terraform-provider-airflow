@@ -143,6 +143,7 @@ func (p *airflowProvider) Resources(_ context.Context) []func() resource.Resourc
 		newUserRolesResource,
 		newDagResource,
 		newDagRunResource,
+		newConnectionResource,
 	}
 }
 

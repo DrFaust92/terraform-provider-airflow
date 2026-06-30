@@ -43,7 +43,7 @@ resource "airflow_connection" "example" {
 
 ### Read-Only
 
-- `id` (String) The ID of this resource.
+- `id` (String) The connection ID.
 
 ## Import
 
