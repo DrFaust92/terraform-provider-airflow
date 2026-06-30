@@ -6,4 +6,10 @@ default: true
 # Disabled Rules
 # https://github.com/DavidAnson/markdownlint/blob/master/doc/Rules.md
 
+# Line length.
 MD013: false
+# Inline HTML: tfplugindocs emits `<a id="...">` anchors for nested schemas.
+MD033: false
+# Blanks around headings: tfplugindocs places the anchor directly above the
+# nested-schema heading, which this rule counts as a missing blank line.
+MD022: false

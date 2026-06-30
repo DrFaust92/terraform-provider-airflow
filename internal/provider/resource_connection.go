@@ -15,6 +15,7 @@ import (
 
 func resourceConnection() *schema.Resource {
 	return &schema.Resource{
+		Description:          "Provides an Airflow connection.",
 		CreateWithoutTimeout: resourceConnectionCreate,
 		ReadWithoutTimeout:   resourceConnectionRead,
 		UpdateWithoutTimeout: resourceConnectionUpdate,
@@ -24,39 +25,47 @@ func resourceConnection() *schema.Resource {
 		},
 		Schema: map[string]*schema.Schema{
 			"connection_id": {
-				Type:     schema.TypeString,
-				Required: true,
-				ForceNew: true,
+				Type:        schema.TypeString,
+				Required:    true,
+				ForceNew:    true,
+				Description: "The connection ID.",
 			},
 			"conn_type": {
-				Type:     schema.TypeString,
-				Required: true,
+				Type:        schema.TypeString,
+				Required:    true,
+				Description: "The connection type.",
 			},
 			"description": {
-				Type:     schema.TypeString,
-				Optional: true,
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "The description of the connection.",
 			},
 			"host": {
-				Type:     schema.TypeString,
-				Optional: true,
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "The host of the connection.",
 			},
 			"login": {
-				Type:     schema.TypeString,
-				Optional: true,
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "The login of the connection.",
 			},
 			"schema": {
-				Type:     schema.TypeString,
-				Optional: true,
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "The schema of the connection.",
 			},
 			"port": {
 				Type:         schema.TypeInt,
 				Optional:     true,
 				ValidateFunc: validation.IsPortNumberOrZero,
+				Description:  "The port of the connection.",
 			},
 			"password": {
-				Type:      schema.TypeString,
-				Optional:  true,
-				Sensitive: true,
+				Type:        schema.TypeString,
+				Optional:    true,
+				Sensitive:   true,
+				Description: "The password of the connection.",
 				DiffSuppressFunc: func(k, old, new string, d *schema.ResourceData) bool {
 					// Suppress diffs only when the new value is a masked placeholder
 					// returned by the API (e.g. "***"). This prevents Terraform
@@ -77,6 +86,7 @@ func resourceConnection() *schema.Resource {
 				WriteOnly:     true,
 				ConflictsWith: []string{"password"},
 				RequiredWith:  []string{"password_wo_version"},
+				Description:   "The password of the connection. This field is write-only and will not be returned by the API.",
 			},
 			"password_wo_version": {
 				Type:         schema.TypeString,
@@ -90,6 +100,7 @@ func resourceConnection() *schema.Resource {
 				ValidateFunc:     validation.StringIsJSON,
 				Optional:         true,
 				Sensitive:        true,
+				Description:      "Other values that cannot be put into another field, e.g. RSA keys.",
 			},
 		},
 	}

@@ -51,37 +51,43 @@ func (r *poolResource) Metadata(_ context.Context, req resource.MetadataRequest,
 
 func (r *poolResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
+		MarkdownDescription: "Provides an Airflow pool.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
-				Computed: true,
+				MarkdownDescription: "The pool name.",
+				Computed:            true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"name": schema.StringAttribute{
-				Required: true,
+				MarkdownDescription: "The name of the pool.",
+				Required:            true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
 			"slots": schema.Int64Attribute{
-				Required: true,
+				MarkdownDescription: "The number of slots in the pool.",
+				Required:            true,
 			},
 			"description": schema.StringAttribute{
-				Optional: true,
-				Computed: true,
+				MarkdownDescription: "The description of the pool.",
+				Optional:            true,
+				Computed:            true,
 			},
 			"include_deferred": schema.BoolAttribute{
-				Optional: true,
-				Computed: true,
-				Default:  booldefault.StaticBool(false),
+				MarkdownDescription: "Whether to include deferred tasks when calculating open pool slots.",
+				Optional:            true,
+				Computed:            true,
+				Default:             booldefault.StaticBool(false),
 			},
-			"occupied_slots":  schema.Int64Attribute{Computed: true},
-			"queued_slots":    schema.Int64Attribute{Computed: true},
-			"open_slots":      schema.Int64Attribute{Computed: true},
-			"running_slots":   schema.Int64Attribute{Computed: true},
-			"deferred_slots":  schema.Int64Attribute{Computed: true},
-			"scheduled_slots": schema.Int64Attribute{Computed: true},
+			"occupied_slots":  schema.Int64Attribute{MarkdownDescription: "The number of slots used.", Computed: true},
+			"queued_slots":    schema.Int64Attribute{MarkdownDescription: "The number of slots with queued tasks.", Computed: true},
+			"open_slots":      schema.Int64Attribute{MarkdownDescription: "The number of open slots in the pool.", Computed: true},
+			"running_slots":   schema.Int64Attribute{MarkdownDescription: "The number of slots with running tasks.", Computed: true},
+			"deferred_slots":  schema.Int64Attribute{MarkdownDescription: "The number of slots with deferred tasks.", Computed: true},
+			"scheduled_slots": schema.Int64Attribute{MarkdownDescription: "The number of slots with scheduled tasks.", Computed: true},
 		},
 	}
 }

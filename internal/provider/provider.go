@@ -71,7 +71,7 @@ func AirflowProvider() *schema.Provider {
 				Type:          schema.TypeString,
 				Optional:      true,
 				Sensitive:     true,
-				Description:   "A session cookie value to use for authentication (sent as Cookie: session=<value>). Useful for AWS MWAA private environments.",
+				Description:   "A session cookie value to use for authentication (sent as Cookie: session={value}). Useful for AWS MWAA private environments.",
 				DefaultFunc:   schema.EnvDefaultFunc("AIRFLOW_SESSION_COOKIE", nil),
 				ConflictsWith: []string{"oauth2_token", "username", "password"},
 			},

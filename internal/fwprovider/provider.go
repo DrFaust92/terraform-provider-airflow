@@ -82,7 +82,7 @@ func (p *airflowProvider) Schema(_ context.Context, _ fwprovider.SchemaRequest, 
 			"session_cookie": schema.StringAttribute{
 				Optional:    true,
 				Sensitive:   true,
-				Description: "A session cookie value to use for authentication (sent as Cookie: session=<value>). Useful for AWS MWAA private environments.",
+				Description: "A session cookie value to use for authentication (sent as Cookie: session={value}). Useful for AWS MWAA private environments.",
 			},
 		},
 	}

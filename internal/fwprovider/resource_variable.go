@@ -43,25 +43,30 @@ func (r *variableResource) Metadata(_ context.Context, req resource.MetadataRequ
 
 func (r *variableResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
+		MarkdownDescription: "Provides an Airflow variable.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
-				Computed: true,
+				MarkdownDescription: "The variable key.",
+				Computed:            true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"key": schema.StringAttribute{
-				Required: true,
+				MarkdownDescription: "The variable key.",
+				Required:            true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
 			"value": schema.StringAttribute{
-				Required: true,
+				MarkdownDescription: "The variable value.",
+				Required:            true,
 			},
 			"description": schema.StringAttribute{
-				Optional: true,
-				Computed: true,
+				MarkdownDescription: "The variable description.",
+				Optional:            true,
+				Computed:            true,
 			},
 		},
 	}
