@@ -76,10 +76,10 @@ func AirflowProvider() *schema.Provider {
 				ConflictsWith: []string{"oauth2_token", "username", "password"},
 			},
 		},
-		ResourcesMap: map[string]*schema.Resource{
-			"airflow_connection": resourceConnection(),
-			// All resources except airflow_connection are served by the Plugin Framework provider (internal/fwprovider), muxed in main.go.
-		},
+		// All resources are now served by the Plugin Framework provider
+		// (internal/fwprovider), muxed in main.go. This SDKv2 provider remains
+		// only to supply the (shared) provider configuration schema and client.
+		ResourcesMap: map[string]*schema.Resource{},
 		// ConfigureContextFunc: providerConfigure,
 	}
 

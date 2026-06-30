@@ -1,13 +1,13 @@
-package provider
+package fwprovider
 
 import (
 	"fmt"
 	"os"
 	"testing"
 
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/acctest"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/terraform"
+	"github.com/hashicorp/terraform-plugin-testing/helper/acctest"
+	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/hashicorp/terraform-plugin-testing/terraform"
 )
 
 func TestAccAirflowConnection_basic(t *testing.T) {
@@ -15,9 +15,9 @@ func TestAccAirflowConnection_basic(t *testing.T) {
 
 	resourceName := "airflow_connection.test"
 	resource.Test(t, resource.TestCase{
-		PreCheck:     func() { testAccPreCheck(t) },
-		Providers:    testAccProviders,
-		CheckDestroy: testAccCheckAirflowConnectionCheckDestroy,
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckAirflowConnectionCheckDestroy,
 		Steps: []resource.TestStep{
 			{
 				Config: testAccAirflowConnectionConfigBasic(rName),
@@ -40,9 +40,9 @@ func TestAccAirflowConnection_passwordWO(t *testing.T) {
 
 	resourceName := "airflow_connection.test"
 	resource.Test(t, resource.TestCase{
-		PreCheck:     func() { testAccPreCheck(t) },
-		Providers:    testAccProviders,
-		CheckDestroy: testAccCheckAirflowConnectionCheckDestroy,
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckAirflowConnectionCheckDestroy,
 		Steps: []resource.TestStep{
 			{
 				Config: testAccAirflowConnectionConfigPasswordWO(rName, "Mustbe8characters", 1),
@@ -72,8 +72,11 @@ func testAccCheckAirflowConnectionPasswordSet(resourceName string) resource.Test
 		if !ok {
 			return fmt.Errorf("resource not found: %s", resourceName)
 		}
-		client := testAccProvider.Meta().(ProviderConfig)
-		conn, _, err := client.ApiClient.ConnectionApi.GetConnection(client.AuthContext, rs.Primary.ID).Execute()
+		cfg, err := testAccProviderConfig()
+		if err != nil {
+			return err
+		}
+		conn, _, err := cfg.ApiClient.ConnectionApi.GetConnection(cfg.AuthContext, rs.Primary.ID).Execute()
 		if err != nil {
 			return fmt.Errorf("failed to get connection %s: %s", rs.Primary.ID, err)
 		}
@@ -95,9 +98,9 @@ func TestAccAirflowConnection_full(t *testing.T) {
 
 	resourceName := "airflow_connection.test"
 	resource.Test(t, resource.TestCase{
-		PreCheck:     func() { testAccPreCheck(t) },
-		Providers:    testAccProviders,
-		CheckDestroy: testAccCheckAirflowConnectionCheckDestroy,
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckAirflowConnectionCheckDestroy,
 		Steps: []resource.TestStep{
 			{
 				Config: testAccAirflowConnectionConfigFull(rName, rName, "test", 443),
@@ -151,16 +154,19 @@ func TestAccAirflowConnection_full(t *testing.T) {
 }
 
 func testAccCheckAirflowConnectionCheckDestroy(s *terraform.State) error {
-	client := testAccProvider.Meta().(ProviderConfig)
+	cfg, err := testAccProviderConfig()
+	if err != nil {
+		return err
+	}
 
 	for _, rs := range s.RootModule().Resources {
 		if rs.Type != "airflow_connection" {
 			continue
 		}
 
-		conn, res, err := client.ApiClient.ConnectionApi.GetConnection(client.AuthContext, rs.Primary.ID).Execute()
+		conn, res, err := cfg.ApiClient.ConnectionApi.GetConnection(cfg.AuthContext, rs.Primary.ID).Execute()
 		if err == nil {
-			if *conn.ConnectionId == rs.Primary.ID {
+			if conn.GetConnectionId() == rs.Primary.ID {
 				return fmt.Errorf("Airflow Connection (%s) still exists.", rs.Primary.ID)
 			}
 		}
@@ -188,7 +194,7 @@ resource "airflow_connection" "test" {
   connection_id = %[1]q
   conn_type     = "http"
   host          = %[2]q
-  description   = %[2]q  
+  description   = %[2]q
   login         = %[2]q
   schema        = %[2]q
   port          = %[4]d
@@ -201,9 +207,9 @@ resource "airflow_connection" "test" {
 func testAccAirflowConnectionConfigPasswordWO(rName, password string, passwordVersion int) string {
 	return fmt.Sprintf(`
 resource "airflow_connection" "test" {
-  connection_id 	  = %[1]q
-  conn_type     	  = "http"
-  password_wo   	  = %[2]q
+  connection_id       = %[1]q
+  conn_type           = "http"
+  password_wo         = %[2]q
   password_wo_version = %[3]d
 }
 `, rName, password, passwordVersion)

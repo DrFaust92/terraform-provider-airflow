@@ -1,0 +1,394 @@
+package fwprovider
+
+import (
+	"context"
+	"fmt"
+	"net/http"
+	"strings"
+
+	"github.com/apache/airflow-client-go/airflow"
+	"github.com/drfaust92/terraform-provider-airflow/internal/provider"
+	"github.com/hashicorp/terraform-plugin-framework-jsontypes/jsontypes"
+	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
+	"github.com/hashicorp/terraform-plugin-framework/path"
+	"github.com/hashicorp/terraform-plugin-framework/resource"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
+	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
+	"github.com/hashicorp/terraform-plugin-framework/types"
+)
+
+var (
+	_ resource.Resource                = &connectionResource{}
+	_ resource.ResourceWithConfigure   = &connectionResource{}
+	_ resource.ResourceWithImportState = &connectionResource{}
+)
+
+func newConnectionResource() resource.Resource {
+	return &connectionResource{}
+}
+
+type connectionResource struct {
+	config provider.ProviderConfig
+}
+
+type connectionResourceModel struct {
+	ID                types.String         `tfsdk:"id"`
+	ConnectionID      types.String         `tfsdk:"connection_id"`
+	ConnType          types.String         `tfsdk:"conn_type"`
+	Description       types.String         `tfsdk:"description"`
+	Host              types.String         `tfsdk:"host"`
+	Login             types.String         `tfsdk:"login"`
+	Schema            types.String         `tfsdk:"schema"`
+	Port              types.Int64          `tfsdk:"port"`
+	Password          types.String         `tfsdk:"password"`
+	PasswordWO        types.String         `tfsdk:"password_wo"`
+	PasswordWOVersion types.String         `tfsdk:"password_wo_version"`
+	Extra             jsontypes.Normalized `tfsdk:"extra"`
+}
+
+func (r *connectionResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
+	resp.TypeName = req.ProviderTypeName + "_connection"
+}
+
+func (r *connectionResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
+	resp.Schema = schema.Schema{
+		MarkdownDescription: "Provides an Airflow connection.",
+		Attributes: map[string]schema.Attribute{
+			"id": schema.StringAttribute{
+				MarkdownDescription: "The connection ID.",
+				Computed:            true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"connection_id": schema.StringAttribute{
+				MarkdownDescription: "The connection ID.",
+				Required:            true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
+			},
+			"conn_type": schema.StringAttribute{
+				MarkdownDescription: "The connection type.",
+				Required:            true,
+			},
+			"description": schema.StringAttribute{
+				MarkdownDescription: "The description of the connection.",
+				Optional:            true,
+			},
+			"host": schema.StringAttribute{
+				MarkdownDescription: "The host of the connection.",
+				Optional:            true,
+			},
+			"login": schema.StringAttribute{
+				MarkdownDescription: "The login of the connection.",
+				Optional:            true,
+			},
+			"schema": schema.StringAttribute{
+				MarkdownDescription: "The schema of the connection.",
+				Optional:            true,
+			},
+			"port": schema.Int64Attribute{
+				MarkdownDescription: "The port of the connection.",
+				Optional:            true,
+				Validators: []validator.Int64{
+					int64validator.Between(0, 65535),
+				},
+			},
+			"password": schema.StringAttribute{
+				MarkdownDescription: "The password of the connection.",
+				Optional:            true,
+				Sensitive:           true,
+				Validators: []validator.String{
+					stringvalidator.ConflictsWith(path.MatchRoot("password_wo")),
+				},
+			},
+			"password_wo": schema.StringAttribute{
+				MarkdownDescription: "The password of the connection. This field is write-only and will not be returned by the API.",
+				Optional:            true,
+				WriteOnly:           true,
+				Validators: []validator.String{
+					stringvalidator.ConflictsWith(path.MatchRoot("password")),
+					stringvalidator.AlsoRequires(path.MatchRoot("password_wo_version")),
+				},
+			},
+			"password_wo_version": schema.StringAttribute{
+				MarkdownDescription: "Triggers update of password_wo write-only. For more info see [updating write-only attributes](https://developer.hashicorp.com/terraform/language/manage-sensitive-data/write-only)",
+				Optional:            true,
+				Validators: []validator.String{
+					stringvalidator.AlsoRequires(path.MatchRoot("password_wo")),
+				},
+			},
+			"extra": schema.StringAttribute{
+				MarkdownDescription: "Other values that cannot be put into another field, e.g. RSA keys.",
+				Optional:            true,
+				Sensitive:           true,
+				CustomType:          jsontypes.NormalizedType{},
+			},
+		},
+	}
+}
+
+func (r *connectionResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
+	if req.ProviderData == nil {
+		return
+	}
+
+	cfg, ok := req.ProviderData.(provider.ProviderConfig)
+	if !ok {
+		resp.Diagnostics.AddError(
+			"Unexpected Resource Configure Type",
+			fmt.Sprintf("Expected provider.ProviderConfig, got: %T. Please report this issue to the provider developers.", req.ProviderData),
+		)
+		return
+	}
+
+	r.config = cfg
+}
+
+func (r *connectionResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+	var plan connectionResourceModel
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	connID := plan.ConnectionID.ValueString()
+	connType := plan.ConnType.ValueString()
+	conn := airflow.Connection{ConnectionId: &connID, ConnType: &connType}
+
+	if !plan.Host.IsNull() {
+		conn.SetHost(plan.Host.ValueString())
+	}
+	if !plan.Description.IsNull() {
+		conn.SetDescription(plan.Description.ValueString())
+	}
+	if !plan.Login.IsNull() {
+		conn.SetLogin(plan.Login.ValueString())
+	}
+	if !plan.Schema.IsNull() {
+		conn.SetSchema(plan.Schema.ValueString())
+	}
+	if !plan.Port.IsNull() {
+		conn.SetPort(int32(plan.Port.ValueInt64()))
+	}
+	if !plan.Extra.IsNull() {
+		conn.SetExtra(plan.Extra.ValueString())
+	}
+
+	if pw := r.resolvePassword(ctx, plan.Password, req.Config, &resp.Diagnostics); pw != "" {
+		conn.SetPassword(pw)
+	}
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	_, httpResp, err := r.config.ApiClient.ConnectionApi.PostConnection(r.config.AuthContext).Connection(conn).Execute()
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to create Airflow connection", clientError("create", connID, httpResp, err))
+		return
+	}
+
+	plan.ID = types.StringValue(connID)
+	if found := r.readInto(&plan, &resp.Diagnostics); resp.Diagnostics.HasError() {
+		return
+	} else if !found {
+		resp.Diagnostics.AddError("Failed to read Airflow connection after create", fmt.Sprintf("connection %q not found immediately after creation", connID))
+		return
+	}
+
+	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
+}
+
+func (r *connectionResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	var state connectionResourceModel
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	found := r.readInto(&state, &resp.Diagnostics)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	if !found {
+		resp.State.RemoveResource(ctx)
+		return
+	}
+
+	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
+}
+
+func (r *connectionResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
+	var plan, state connectionResourceModel
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	connID := plan.ID.ValueString()
+	connType := plan.ConnType.ValueString()
+	conn := airflow.Connection{ConnectionId: &connID, ConnType: &connType}
+
+	// Optional fields are explicitly cleared when absent, mirroring the SDKv2
+	// resource's *Nil() calls.
+	if !plan.Host.IsNull() {
+		conn.SetHost(plan.Host.ValueString())
+	} else {
+		conn.SetHostNil()
+	}
+	if !plan.Description.IsNull() {
+		conn.SetDescription(plan.Description.ValueString())
+	} else {
+		conn.SetDescriptionNil()
+	}
+	if !plan.Login.IsNull() {
+		conn.SetLogin(plan.Login.ValueString())
+	} else {
+		conn.SetLoginNil()
+	}
+	if !plan.Schema.IsNull() {
+		conn.SetSchema(plan.Schema.ValueString())
+	} else {
+		conn.SetSchemaNil()
+	}
+	if !plan.Port.IsNull() {
+		conn.SetPort(int32(plan.Port.ValueInt64()))
+	} else {
+		conn.SetPortNil()
+	}
+	if !plan.Extra.IsNull() {
+		conn.SetExtra(plan.Extra.ValueString())
+	} else {
+		conn.SetExtraNil()
+	}
+
+	if !plan.Password.IsNull() && plan.Password.ValueString() != "" {
+		conn.SetPassword(plan.Password.ValueString())
+	} else if !plan.PasswordWOVersion.Equal(state.PasswordWOVersion) {
+		if pw := r.writeOnlyPassword(ctx, req.Config, &resp.Diagnostics); pw != "" {
+			conn.SetPassword(pw)
+		}
+	}
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	_, httpResp, err := r.config.ApiClient.ConnectionApi.PatchConnection(r.config.AuthContext, connID).Connection(conn).Execute()
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to update Airflow connection", clientError("update", connID, httpResp, err))
+		return
+	}
+
+	if found := r.readInto(&plan, &resp.Diagnostics); resp.Diagnostics.HasError() {
+		return
+	} else if !found {
+		resp.State.RemoveResource(ctx)
+		return
+	}
+
+	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
+}
+
+func (r *connectionResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
+	var state connectionResourceModel
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	id := state.ID.ValueString()
+	httpResp, err := r.config.ApiClient.ConnectionApi.DeleteConnection(r.config.AuthContext, id).Execute()
+	if err != nil {
+		if httpResp != nil && httpResp.StatusCode == http.StatusNotFound {
+			return
+		}
+		resp.Diagnostics.AddError("Failed to delete Airflow connection", clientError("delete", id, httpResp, err))
+	}
+}
+
+func (r *connectionResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
+}
+
+// resolvePassword returns the password to send on create: the configured
+// password if set, otherwise the write-only password_wo value.
+func (r *connectionResource) resolvePassword(ctx context.Context, password types.String, config tfsdk.Config, diags *diag.Diagnostics) string {
+	if !password.IsNull() && password.ValueString() != "" {
+		return password.ValueString()
+	}
+	return r.writeOnlyPassword(ctx, config, diags)
+}
+
+// writeOnlyPassword reads the write-only password_wo attribute from config.
+func (r *connectionResource) writeOnlyPassword(ctx context.Context, config tfsdk.Config, diags *diag.Diagnostics) string {
+	var pwWO types.String
+	diags.Append(config.GetAttribute(ctx, path.Root("password_wo"), &pwWO)...)
+	if diags.HasError() || pwWO.IsNull() || pwWO.IsUnknown() {
+		return ""
+	}
+	return pwWO.ValueString()
+}
+
+// readInto fetches the connection identified by m.ID and populates m. Optional
+// attributes preserve their null-ness when the API returns an empty value, and
+// the password is preserved when the API hides it (absent or masked). Returns
+// false (without diagnostics) when the connection no longer exists.
+func (r *connectionResource) readInto(m *connectionResourceModel, diags *diag.Diagnostics) (found bool) {
+	id := m.ID.ValueString()
+
+	conn, httpResp, err := r.config.ApiClient.ConnectionApi.GetConnection(r.config.AuthContext, id).Execute()
+	if httpResp != nil && httpResp.StatusCode == http.StatusNotFound {
+		return false
+	}
+	if err != nil {
+		diags.AddError("Failed to read Airflow connection", clientError("read", id, httpResp, err))
+		return false
+	}
+
+	m.ConnectionID = types.StringValue(conn.GetConnectionId())
+	m.ConnType = types.StringValue(conn.GetConnType())
+	setOptionalString(&m.Host, conn.GetHost())
+	setOptionalString(&m.Login, conn.GetLogin())
+	setOptionalString(&m.Schema, conn.GetSchema())
+	setOptionalString(&m.Description, conn.GetDescription())
+
+	if p := conn.GetPort(); p != 0 {
+		m.Port = types.Int64Value(int64(p))
+	} else if !m.Port.IsNull() {
+		m.Port = types.Int64Value(0)
+	}
+
+	if e := conn.GetExtra(); e != "" {
+		m.Extra = jsontypes.NewNormalizedValue(e)
+	} else if !m.Extra.IsNull() {
+		m.Extra = jsontypes.NewNormalizedNull()
+	}
+
+	// Preserve the configured password unless the API returns a real
+	// (non-masked, non-empty) value.
+	if pw, ok := conn.GetPasswordOk(); ok && pw != nil {
+		if s := *pw; strings.TrimSpace(s) != "" && strings.Trim(s, "*") != "" {
+			m.Password = types.StringValue(s)
+		}
+	}
+
+	return true
+}
+
+// setOptionalString updates an Optional string attribute from an API value while
+// preserving null-ness: an empty API value leaves a null attribute null (so it
+// keeps matching a config that omits it) but clears a previously set value.
+func setOptionalString(attr *types.String, apiValue string) {
+	if apiValue != "" {
+		*attr = types.StringValue(apiValue)
+	} else if !attr.IsNull() {
+		*attr = types.StringValue("")
+	}
+}
