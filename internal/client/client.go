@@ -24,7 +24,7 @@ type ProviderConfig struct {
 // NewProviderConfig builds the Airflow API client and auth context from the
 // already-resolved provider configuration values.
 func NewProviderConfig(endpoint, oauth2Token, username, password string, disableSSL bool, basePath, sessionCookie string) (ProviderConfig, error) {
-	var transport http.RoundTripper = http.DefaultTransport
+	transport := http.DefaultTransport
 	if disableSSL {
 		transport = &http.Transport{
 			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
