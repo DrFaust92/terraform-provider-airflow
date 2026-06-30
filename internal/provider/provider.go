@@ -78,8 +78,7 @@ func AirflowProvider() *schema.Provider {
 		},
 		ResourcesMap: map[string]*schema.Resource{
 			"airflow_connection": resourceConnection(),
-			"airflow_dag_run":    resourceDagRun(),
-			// airflow_variable, airflow_pool, airflow_role, airflow_user, airflow_user_roles and airflow_dag are served by the Plugin Framework provider (internal/fwprovider), muxed in main.go.
+			// All resources except airflow_connection are served by the Plugin Framework provider (internal/fwprovider), muxed in main.go.
 		},
 		// ConfigureContextFunc: providerConfigure,
 	}
