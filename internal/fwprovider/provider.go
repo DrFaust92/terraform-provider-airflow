@@ -137,6 +137,7 @@ func (p *airflowProvider) Configure(_ context.Context, req fwprovider.ConfigureR
 func (p *airflowProvider) Resources(_ context.Context) []func() resource.Resource {
 	return []func() resource.Resource{
 		newVariableResource,
+		newPoolResource,
 	}
 }
 
