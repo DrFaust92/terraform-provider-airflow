@@ -39,7 +39,7 @@ resource "airflow_user" "example" {
 
 - `active` (Boolean) Whether the user is active.
 - `failed_login_count` (Number) The number of times the login failed.
-- `id` (String) The ID of this resource.
+- `id` (String) The username.
 - `login_count` (String) The login count.
 
 ## Import
