@@ -33,5 +33,9 @@ jobs:
 
       - name: Check for uncommitted changes
         run: |
-          git diff --compact-summary --exit-status || \
-            (echo; echo "Documentation is out of date. Run 'make generate' and commit the changes."; exit 1)
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "Documentation is out of date. Run 'make generate' and commit the changes."
+            git status --porcelain
+            git diff
+            exit 1
+          fi
