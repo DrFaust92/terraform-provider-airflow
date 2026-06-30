@@ -111,3 +111,35 @@ resource "airflow_user" "test" {
 }
 `, rName, fName)
 }
+
+// TestAccAirflowUser_upgradeFromSDKv2 guards the SDKv2 -> framework upgrade path
+// for airflow_user (and the airflow_role it references).
+func TestAccAirflowUser_upgradeFromSDKv2(t *testing.T) {
+	if os.Getenv("SKIP_AIRFLOW_USER_ROLES_TESTS") == "true" {
+		t.Skip("Skipping Airflow Roles and User Tests")
+	}
+	rName := acctest.RandomWithPrefix("tf-acc-test")
+	resourceName := "airflow_user.test"
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:     func() { testAccPreCheck(t) },
+		CheckDestroy: testAccCheckAirflowUserCheckDestroy,
+		Steps: []resource.TestStep{
+			{
+				ExternalProviders: map[string]resource.ExternalProvider{
+					"airflow": {VersionConstraint: "1.0.2", Source: "DrFaust92/airflow"},
+				},
+				Config: testAccAirflowUserConfigBasic(rName, rName),
+				Check:  resource.TestCheckResourceAttr(resourceName, "username", rName),
+			},
+			{
+				ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+				Config:                   testAccAirflowUserConfigBasic(rName, rName),
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr(resourceName, "username", rName),
+					resource.TestCheckResourceAttr(resourceName, "roles.#", "1"),
+				),
+			},
+		},
+	})
+}

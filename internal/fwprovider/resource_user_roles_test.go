@@ -185,3 +185,35 @@ func testAccPreCheckCreateUser(t *testing.T) {
 		t.Fatalf("failed to create user `%s` from Airflow: %s", username, err)
 	}
 }
+
+// TestAccAirflowUserRoles_upgradeFromSDKv2 guards the SDKv2 -> framework upgrade
+// path for airflow_user_roles (and the airflow_role it references).
+func TestAccAirflowUserRoles_upgradeFromSDKv2(t *testing.T) {
+	if os.Getenv("SKIP_AIRFLOW_USER_ROLES_TESTS") == "true" {
+		t.Skip("Skipping Airflow Roles and User Tests")
+	}
+	rName := acctest.RandomWithPrefix("tf-role-test")
+	resourceName := "airflow_user_roles.test"
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:     func() { testAccPreCheckCreateUser(t) },
+		CheckDestroy: testAccCheckAirflowUserRolesCheckDestroy,
+		Steps: []resource.TestStep{
+			{
+				ExternalProviders: map[string]resource.ExternalProvider{
+					"airflow": {VersionConstraint: "1.0.2", Source: "DrFaust92/airflow"},
+				},
+				Config: testAccAirflowUserRolesConfigBasic(accName, rName),
+				Check:  resource.TestCheckResourceAttr(resourceName, "username", accName),
+			},
+			{
+				ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+				Config:                   testAccAirflowUserRolesConfigBasic(accName, rName),
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr(resourceName, "username", accName),
+					resource.TestCheckResourceAttr(resourceName, "roles.#", "1"),
+				),
+			},
+		},
+	})
+}

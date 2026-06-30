@@ -3,6 +3,7 @@ package fwprovider
 import (
 	"fmt"
 	"os"
+	"regexp"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/acctest"
@@ -290,6 +291,53 @@ func TestAccAirflowConnection_extraEquivalentJSON(t *testing.T) {
 				// Same JSON, reformatted (whitespace + key order): must be a no-op.
 				Config:   testAccAirflowConnectionConfigExtra(rName, "{\n  \"c\": \"d\",\n  \"a\": \"b\"\n}"),
 				PlanOnly: true,
+			},
+		},
+	})
+}
+
+// TestAccAirflowConnection_validation covers the framework validators on the
+// connection resource (config-time, no API calls): password/password_wo
+// conflict, the password_wo/password_wo_version co-requirement, and the port
+// range bound.
+func TestAccAirflowConnection_validation(t *testing.T) {
+	rName := acctest.RandomWithPrefix("tf-acc-test")
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: fmt.Sprintf(`
+resource "airflow_connection" "test" {
+  connection_id       = %[1]q
+  conn_type           = "http"
+  password            = "p"
+  password_wo         = "w"
+  password_wo_version = "1"
+}
+`, rName),
+				ExpectError: regexp.MustCompile(`Invalid Attribute Combination`),
+			},
+			{
+				Config: fmt.Sprintf(`
+resource "airflow_connection" "test" {
+  connection_id = %[1]q
+  conn_type     = "http"
+  password_wo   = "w"
+}
+`, rName),
+				ExpectError: regexp.MustCompile(`Invalid Attribute Combination`),
+			},
+			{
+				Config: fmt.Sprintf(`
+resource "airflow_connection" "test" {
+  connection_id = %[1]q
+  conn_type     = "http"
+  port          = 70000
+}
+`, rName),
+				ExpectError: regexp.MustCompile(`Invalid Attribute Value`),
 			},
 		},
 	})
