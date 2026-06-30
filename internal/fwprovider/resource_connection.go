@@ -368,9 +368,15 @@ func (r *connectionResource) readInto(m *connectionResourceModel, diags *diag.Di
 		m.Port = types.Int64Value(0)
 	}
 
-	if e := conn.GetExtra(); e != "" {
-		m.Extra = types.StringValue(e)
-	} else if !m.Extra.IsNull() {
+	apiExtra := conn.GetExtra()
+	switch {
+	case !m.Extra.IsNull() && jsonSemanticEqual(m.Extra.ValueString(), apiExtra):
+		// Keep the configured/state value when it is semantically-equal JSON to
+		// what the API returns, so the post-apply value matches the plan
+		// (the API may reformat JSON).
+	case apiExtra != "":
+		m.Extra = types.StringValue(apiExtra)
+	case !m.Extra.IsNull():
 		m.Extra = types.StringValue("")
 	}
 
@@ -417,17 +423,21 @@ func (m suppressEquivalentJSON) PlanModifyString(_ context.Context, req planmodi
 		return
 	}
 
-	oldVal, newVal := req.StateValue.ValueString(), req.PlanValue.ValueString()
-	if oldVal == newVal {
-		return
-	}
-
-	var oldJSON, newJSON interface{}
-	if json.Unmarshal([]byte(oldVal), &oldJSON) != nil || json.Unmarshal([]byte(newVal), &newJSON) != nil {
-		// Not both valid JSON: keep the normal string diff.
-		return
-	}
-	if reflect.DeepEqual(oldJSON, newJSON) {
+	if jsonSemanticEqual(req.StateValue.ValueString(), req.PlanValue.ValueString()) {
 		resp.PlanValue = req.StateValue
 	}
+}
+
+// jsonSemanticEqual reports whether a and b are both valid JSON and deeply
+// equal (ignoring formatting/key order). Non-JSON values are never equal here,
+// so callers fall back to normal string comparison for them.
+func jsonSemanticEqual(a, b string) bool {
+	if a == b {
+		return true
+	}
+	var av, bv interface{}
+	if json.Unmarshal([]byte(a), &av) != nil || json.Unmarshal([]byte(b), &bv) != nil {
+		return false
+	}
+	return reflect.DeepEqual(av, bv)
 }

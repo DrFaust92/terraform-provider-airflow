@@ -221,8 +221,8 @@ resource "airflow_connection" "test" {
 // TestAccAirflowConnection_upgradeFromSDKv2 reproduces the regression where a
 // connection created by the SDKv2 provider (which stored an unset `extra` as "")
 // failed under the framework provider with "Invalid JSON String Value". Step 1
-// creates the connection with the last SDKv2 release; step 2 plans it with the
-// current (framework) provider and asserts an empty, error-free plan.
+// creates the connection with the last SDKv2 release; step 2 applies it with the
+// current (framework) provider and must succeed and converge to a stable plan.
 func TestAccAirflowConnection_upgradeFromSDKv2(t *testing.T) {
 	rName := acctest.RandomWithPrefix("tf-acc-test")
 	resourceName := "airflow_connection.test"
@@ -241,9 +241,17 @@ func TestAccAirflowConnection_upgradeFromSDKv2(t *testing.T) {
 				),
 			},
 			{
+				// Plan + apply with the current (framework) provider. Previously
+				// this errored with "Invalid JSON String Value" while reading the
+				// SDKv2-written extra="". It now applies (normalizing the SDKv2
+				// ""/0 representations of unset optionals to null) and the
+				// built-in post-apply plan check confirms it converges.
 				ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 				Config:                   testAccAirflowConnectionConfigBasic(rName),
-				PlanOnly:                 true,
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr(resourceName, "connection_id", rName),
+					resource.TestCheckResourceAttr(resourceName, "conn_type", "http"),
+				),
 			},
 		},
 	})
