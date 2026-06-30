@@ -10,6 +10,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
+	"github.com/hashicorp/terraform-plugin-framework/resource/identityschema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
@@ -20,7 +21,13 @@ var (
 	_ resource.Resource                = &variableResource{}
 	_ resource.ResourceWithConfigure   = &variableResource{}
 	_ resource.ResourceWithImportState = &variableResource{}
+	_ resource.ResourceWithIdentity    = &variableResource{}
 )
+
+// variableIdentityModel is the resource identity for airflow_variable (its key).
+type variableIdentityModel struct {
+	ID types.String `tfsdk:"id"`
+}
 
 func newVariableResource() resource.Resource {
 	return &variableResource{}
@@ -67,6 +74,16 @@ func (r *variableResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 				MarkdownDescription: "The variable description.",
 				Optional:            true,
 				Computed:            true,
+			},
+		},
+	}
+}
+
+func (r *variableResource) IdentitySchema(_ context.Context, _ resource.IdentitySchemaRequest, resp *resource.IdentitySchemaResponse) {
+	resp.IdentitySchema = identityschema.Schema{
+		Attributes: map[string]identityschema.Attribute{
+			"id": identityschema.StringAttribute{
+				RequiredForImport: true,
 			},
 		},
 	}
@@ -121,6 +138,7 @@ func (r *variableResource) Create(ctx context.Context, req resource.CreateReques
 		return
 	}
 
+	resp.Diagnostics.Append(resp.Identity.Set(ctx, variableIdentityModel{ID: types.StringValue(key)})...)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
@@ -140,6 +158,7 @@ func (r *variableResource) Read(ctx context.Context, req resource.ReadRequest, r
 		return
 	}
 
+	resp.Diagnostics.Append(resp.Identity.Set(ctx, variableIdentityModel{ID: state.ID})...)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
@@ -177,6 +196,7 @@ func (r *variableResource) Update(ctx context.Context, req resource.UpdateReques
 		return
 	}
 
+	resp.Diagnostics.Append(resp.Identity.Set(ctx, variableIdentityModel{ID: plan.ID})...)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 

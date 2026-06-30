@@ -13,3 +13,6 @@ MD033: false
 # Blanks around headings: tfplugindocs places the anchor directly above the
 # nested-schema heading, which this rule counts as a missing blank line.
 MD022: false
+# Multiple blank lines: list-resource pages with an empty config schema render
+# consecutive blank lines in the generated output.
+MD012: false

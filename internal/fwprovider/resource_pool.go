@@ -10,6 +10,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
+	"github.com/hashicorp/terraform-plugin-framework/resource/identityschema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
@@ -21,7 +22,12 @@ var (
 	_ resource.Resource                = &poolResource{}
 	_ resource.ResourceWithConfigure   = &poolResource{}
 	_ resource.ResourceWithImportState = &poolResource{}
+	_ resource.ResourceWithIdentity    = &poolResource{}
 )
+
+type poolIdentityModel struct {
+	ID types.String `tfsdk:"id"`
+}
 
 func newPoolResource() resource.Resource {
 	return &poolResource{}
@@ -92,6 +98,14 @@ func (r *poolResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 	}
 }
 
+func (r *poolResource) IdentitySchema(_ context.Context, _ resource.IdentitySchemaRequest, resp *resource.IdentitySchemaResponse) {
+	resp.IdentitySchema = identityschema.Schema{
+		Attributes: map[string]identityschema.Attribute{
+			"id": identityschema.StringAttribute{RequiredForImport: true},
+		},
+	}
+}
+
 func (r *poolResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
 	if req.ProviderData == nil {
 		return
@@ -143,6 +157,7 @@ func (r *poolResource) Create(ctx context.Context, req resource.CreateRequest, r
 		return
 	}
 
+	resp.Diagnostics.Append(resp.Identity.Set(ctx, poolIdentityModel{ID: plan.ID})...)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
@@ -162,6 +177,7 @@ func (r *poolResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 		return
 	}
 
+	resp.Diagnostics.Append(resp.Identity.Set(ctx, poolIdentityModel{ID: state.ID})...)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
@@ -201,6 +217,7 @@ func (r *poolResource) Update(ctx context.Context, req resource.UpdateRequest, r
 		return
 	}
 
+	resp.Diagnostics.Append(resp.Identity.Set(ctx, poolIdentityModel{ID: plan.ID})...)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 

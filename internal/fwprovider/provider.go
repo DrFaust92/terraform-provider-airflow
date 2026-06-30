@@ -8,6 +8,7 @@ import (
 
 	"github.com/drfaust92/terraform-provider-airflow/internal/client"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
+	"github.com/hashicorp/terraform-plugin-framework/list"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	fwprovider "github.com/hashicorp/terraform-plugin-framework/provider"
 	"github.com/hashicorp/terraform-plugin-framework/provider/schema"
@@ -18,7 +19,10 @@ import (
 // defaultBasePath is the default AIRFLOW_API_BASE_PATH.
 const defaultBasePath = "/api/v1"
 
-var _ fwprovider.Provider = &airflowProvider{}
+var (
+	_ fwprovider.Provider                  = &airflowProvider{}
+	_ fwprovider.ProviderWithListResources = &airflowProvider{}
+)
 
 type airflowProvider struct {
 	version string
@@ -136,6 +140,16 @@ func (p *airflowProvider) Resources(_ context.Context) []func() resource.Resourc
 
 func (p *airflowProvider) DataSources(_ context.Context) []func() datasource.DataSource {
 	return nil
+}
+
+// ListResources returns the resource types that support `terraform query` /
+// list-based import-config generation.
+func (p *airflowProvider) ListResources(_ context.Context) []func() list.ListResource {
+	return []func() list.ListResource{
+		newVariableListResource,
+		newPoolListResource,
+		newConnectionListResource,
+	}
 }
 
 // stringOrEnv returns the configured value when known and non-null, otherwise

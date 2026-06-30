@@ -39,3 +39,31 @@ func testAccPreCheck(t *testing.T) {
 		t.Fatal("AIRFLOW_BASE_ENDPOINT must be set for acceptance tests")
 	}
 }
+
+// TestListResourcesRegistered verifies the provider advertises the list
+// resources and that each list resource's type name matches a managed resource
+// (the framework returns an error diagnostic at GetMetadata otherwise).
+func TestListResourcesRegistered(t *testing.T) {
+	ctx := context.Background()
+	srv := providerserver.NewProtocol6(New("test")())()
+
+	resp, err := srv.GetMetadata(ctx, &tfprotov6.GetMetadataRequest{})
+	if err != nil {
+		t.Fatalf("GetMetadata error: %s", err)
+	}
+	for _, d := range resp.Diagnostics {
+		if d.Severity == tfprotov6.DiagnosticSeverityError {
+			t.Fatalf("metadata diagnostic: %s: %s", d.Summary, d.Detail)
+		}
+	}
+
+	got := make(map[string]bool)
+	for _, lr := range resp.ListResources {
+		got[lr.TypeName] = true
+	}
+	for _, want := range []string{"airflow_variable", "airflow_pool", "airflow_connection"} {
+		if !got[want] {
+			t.Errorf("expected list resource %q to be registered; got %v", want, got)
+		}
+	}
+}
