@@ -15,6 +15,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
+	"github.com/hashicorp/terraform-plugin-framework/resource/identityschema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
@@ -27,7 +28,12 @@ var (
 	_ resource.Resource                = &connectionResource{}
 	_ resource.ResourceWithConfigure   = &connectionResource{}
 	_ resource.ResourceWithImportState = &connectionResource{}
+	_ resource.ResourceWithIdentity    = &connectionResource{}
 )
+
+type connectionIdentityModel struct {
+	ID types.String `tfsdk:"id"`
+}
 
 func newConnectionResource() resource.Resource {
 	return &connectionResource{}
@@ -137,6 +143,14 @@ func (r *connectionResource) Schema(_ context.Context, _ resource.SchemaRequest,
 	}
 }
 
+func (r *connectionResource) IdentitySchema(_ context.Context, _ resource.IdentitySchemaRequest, resp *resource.IdentitySchemaResponse) {
+	resp.IdentitySchema = identityschema.Schema{
+		Attributes: map[string]identityschema.Attribute{
+			"id": identityschema.StringAttribute{RequiredForImport: true},
+		},
+	}
+}
+
 func (r *connectionResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
 	if req.ProviderData == nil {
 		return
@@ -205,6 +219,7 @@ func (r *connectionResource) Create(ctx context.Context, req resource.CreateRequ
 		return
 	}
 
+	resp.Diagnostics.Append(resp.Identity.Set(ctx, connectionIdentityModel{ID: plan.ID})...)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
@@ -224,6 +239,7 @@ func (r *connectionResource) Read(ctx context.Context, req resource.ReadRequest,
 		return
 	}
 
+	resp.Diagnostics.Append(resp.Identity.Set(ctx, connectionIdentityModel{ID: state.ID})...)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
@@ -296,6 +312,7 @@ func (r *connectionResource) Update(ctx context.Context, req resource.UpdateRequ
 		return
 	}
 
+	resp.Diagnostics.Append(resp.Identity.Set(ctx, connectionIdentityModel{ID: plan.ID})...)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
