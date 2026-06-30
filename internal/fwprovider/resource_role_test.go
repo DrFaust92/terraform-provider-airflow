@@ -91,3 +91,35 @@ resource "airflow_role" "test" {
 }
 `, rName, action, resource)
 }
+
+// TestAccAirflowRole_upgradeFromSDKv2 guards the SDKv2 -> framework upgrade path
+// for the role's nested `action` block.
+func TestAccAirflowRole_upgradeFromSDKv2(t *testing.T) {
+	if os.Getenv("SKIP_AIRFLOW_USER_ROLES_TESTS") == "true" {
+		t.Skip("Skipping Airflow Roles and User Tests")
+	}
+	rName := acctest.RandomWithPrefix("tf-acc-test")
+	resourceName := "airflow_role.test"
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:     func() { testAccPreCheck(t) },
+		CheckDestroy: testAccCheckAirflowRoleCheckDestroy,
+		Steps: []resource.TestStep{
+			{
+				ExternalProviders: map[string]resource.ExternalProvider{
+					"airflow": {VersionConstraint: "1.0.2", Source: "DrFaust92/airflow"},
+				},
+				Config: testAccAirflowRoleConfigBasic(rName, "can_read", "Audit Logs"),
+				Check:  resource.TestCheckResourceAttr(resourceName, "name", rName),
+			},
+			{
+				ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+				Config:                   testAccAirflowRoleConfigBasic(rName, "can_read", "Audit Logs"),
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr(resourceName, "name", rName),
+					resource.TestCheckResourceAttr(resourceName, "action.#", "1"),
+				),
+			},
+		},
+	})
+}
