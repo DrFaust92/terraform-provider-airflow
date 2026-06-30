@@ -1,13 +1,13 @@
-package provider
+package fwprovider
 
 import (
 	"fmt"
 	"os"
 	"testing"
 
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/acctest"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/terraform"
+	"github.com/hashicorp/terraform-plugin-testing/helper/acctest"
+	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/hashicorp/terraform-plugin-testing/terraform"
 )
 
 func TestAccAirflowRole_basic(t *testing.T) {
@@ -18,9 +18,9 @@ func TestAccAirflowRole_basic(t *testing.T) {
 
 	resourceName := "airflow_role.test"
 	resource.Test(t, resource.TestCase{
-		PreCheck:     func() { testAccPreCheck(t) },
-		Providers:    testAccProviders,
-		CheckDestroy: testAccCheckAirflowRoleCheckDestroy,
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckAirflowRoleCheckDestroy,
 		Steps: []resource.TestStep{
 			{
 				Config: testAccAirflowRoleConfigBasic(rName, "can_read", "Audit Logs"),
@@ -54,16 +54,19 @@ func TestAccAirflowRole_basic(t *testing.T) {
 }
 
 func testAccCheckAirflowRoleCheckDestroy(s *terraform.State) error {
-	client := testAccProvider.Meta().(ProviderConfig)
+	cfg, err := testAccProviderConfig()
+	if err != nil {
+		return err
+	}
 
 	for _, rs := range s.RootModule().Resources {
 		if rs.Type != "airflow_role" {
 			continue
 		}
 
-		variable, res, err := client.ApiClient.RoleApi.GetRole(client.AuthContext, rs.Primary.ID).Execute()
+		role, res, err := cfg.ApiClient.RoleApi.GetRole(cfg.AuthContext, rs.Primary.ID).Execute()
 		if err == nil {
-			if *variable.Name == rs.Primary.ID {
+			if role.GetName() == rs.Primary.ID {
 				return fmt.Errorf("Airflow Role (%s) still exists.", rs.Primary.ID)
 			}
 		}
@@ -79,12 +82,12 @@ func testAccCheckAirflowRoleCheckDestroy(s *terraform.State) error {
 func testAccAirflowRoleConfigBasic(rName, action, resource string) string {
 	return fmt.Sprintf(`
 resource "airflow_role" "test" {
-  name   = %[1]q
+  name = %[1]q
 
   action {
     action   = %[2]q
-	resource = %[3]q
-  } 
+    resource = %[3]q
+  }
 }
 `, rName, action, resource)
 }

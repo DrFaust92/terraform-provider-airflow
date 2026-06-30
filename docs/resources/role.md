@@ -28,12 +28,15 @@ resource "airflow_role" "example" {
 
 ### Required
 
-- `action` (Block Set, Min: 1) The action struct that defines the role. (see [below for nested schema](#nestedblock--action))
 - `name` (String) The name of the role.
+
+### Optional
+
+- `action` (Block Set) The action struct that defines the role. (see [below for nested schema](#nestedblock--action))
 
 ### Read-Only
 
-- `id` (String) The ID of this resource.
+- `id` (String) The role name.
 
 <a id="nestedblock--action"></a>
 ### Nested Schema for `action`

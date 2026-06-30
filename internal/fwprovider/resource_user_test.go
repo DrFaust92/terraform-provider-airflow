@@ -1,14 +1,19 @@
-package provider
+package fwprovider
 
 import (
 	"fmt"
 	"os"
 	"testing"
 
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/acctest"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/terraform"
+	"github.com/hashicorp/terraform-plugin-testing/helper/acctest"
+	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/hashicorp/terraform-plugin-testing/terraform"
 )
+
+// NOTE: airflow_user is still served by the SDKv2 provider, but its acceptance
+// test config also creates an airflow_role (now framework-served), so it must
+// run through the muxed provider. The test lives here until airflow_user is
+// itself migrated to the framework.
 
 func TestAccAirflowUser_basic(t *testing.T) {
 	if os.Getenv("SKIP_AIRFLOW_USER_ROLES_TESTS") == "true" {
@@ -19,9 +24,9 @@ func TestAccAirflowUser_basic(t *testing.T) {
 
 	resourceName := "airflow_user.test"
 	resource.Test(t, resource.TestCase{
-		PreCheck:     func() { testAccPreCheck(t) },
-		Providers:    testAccProviders,
-		CheckDestroy: testAccCheckAirflowUserCheckDestroy,
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckAirflowUserCheckDestroy,
 		Steps: []resource.TestStep{
 			{
 				Config: testAccAirflowUserConfigBasic(rName, rName),
@@ -60,16 +65,19 @@ func TestAccAirflowUser_basic(t *testing.T) {
 }
 
 func testAccCheckAirflowUserCheckDestroy(s *terraform.State) error {
-	client := testAccProvider.Meta().(ProviderConfig)
+	cfg, err := testAccProviderConfig()
+	if err != nil {
+		return err
+	}
 
 	for _, rs := range s.RootModule().Resources {
 		if rs.Type != "airflow_user" {
 			continue
 		}
 
-		user, res, err := client.ApiClient.UserApi.GetUser(client.AuthContext, rs.Primary.ID).Execute()
+		user, res, err := cfg.ApiClient.UserApi.GetUser(cfg.AuthContext, rs.Primary.ID).Execute()
 		if err == nil {
-			if *user.Username == rs.Primary.ID {
+			if user.GetUsername() == rs.Primary.ID {
 				return fmt.Errorf("Airflow User (%s) still exists.", rs.Primary.ID)
 			}
 		}
@@ -85,12 +93,12 @@ func testAccCheckAirflowUserCheckDestroy(s *terraform.State) error {
 func testAccAirflowUserConfigBasic(rName, fName string) string {
 	return fmt.Sprintf(`
 resource "airflow_role" "test" {
-  name   = %[1]q
+  name = %[1]q
 
   action {
     action   = "can_read"
-	resource = "Audit Logs"
-  } 
+    resource = "Audit Logs"
+  }
 }
 
 resource "airflow_user" "test" {

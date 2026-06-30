@@ -1,4 +1,4 @@
-package provider
+package fwprovider
 
 import (
 	"context"
@@ -10,11 +10,15 @@ import (
 	"testing"
 
 	"github.com/apache/airflow-client-go/airflow"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/acctest"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/logging"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/terraform"
+	"github.com/hashicorp/terraform-plugin-testing/helper/acctest"
+	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/hashicorp/terraform-plugin-testing/terraform"
 )
+
+// NOTE: airflow_user_roles is still served by the SDKv2 provider, but its
+// acceptance test config also creates airflow_role (now framework-served), so
+// it must run through the muxed provider. The test lives here until
+// airflow_user_roles is itself migrated to the framework.
 
 const (
 	accName = "tf-acc-test-user-roles"
@@ -29,9 +33,9 @@ func TestAccAirflowUserRoles_basic(t *testing.T) {
 
 	resourceName := "airflow_user_roles.test"
 	resource.Test(t, resource.TestCase{
-		PreCheck:     func() { testAccPreCheckCreateUser(t) },
-		Providers:    testAccProviders,
-		CheckDestroy: testAccCheckAirflowUserRolesCheckDestroy,
+		PreCheck:                 func() { testAccPreCheckCreateUser(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckAirflowUserRolesCheckDestroy,
 		Steps: []resource.TestStep{
 			{
 				Config: testAccAirflowUserRolesConfigBasic(accName, rName),
@@ -60,14 +64,17 @@ func TestAccAirflowUserRoles_basic(t *testing.T) {
 }
 
 func testAccCheckAirflowUserRolesCheckDestroy(s *terraform.State) error {
-	client := testAccProvider.Meta().(ProviderConfig)
+	cfg, err := testAccProviderConfig()
+	if err != nil {
+		return err
+	}
 
 	for _, rs := range s.RootModule().Resources {
 		if rs.Type != "airflow_user_roles" {
 			continue
 		}
 
-		user, res, err := client.ApiClient.UserApi.GetUser(client.AuthContext, rs.Primary.ID).Execute()
+		user, res, err := cfg.ApiClient.UserApi.GetUser(cfg.AuthContext, rs.Primary.ID).Execute()
 		if err == nil {
 			if len(user.Roles) != 0 {
 				return fmt.Errorf("Airflow User (%s) still have some roles.", rs.Primary.ID)
@@ -78,7 +85,7 @@ func testAccCheckAirflowUserRolesCheckDestroy(s *terraform.State) error {
 			continue
 		}
 	}
-	_, _ = client.ApiClient.UserApi.DeleteUser(client.AuthContext, accName).Execute()
+	_, _ = cfg.ApiClient.UserApi.DeleteUser(cfg.AuthContext, accName).Execute()
 
 	return nil
 }
@@ -86,17 +93,17 @@ func testAccCheckAirflowUserRolesCheckDestroy(s *terraform.State) error {
 func testAccAirflowUserRolesConfigBasic(accName, rName string) string {
 	return fmt.Sprintf(`
 resource "airflow_role" "test" {
-  name   = %[1]q
+  name = %[1]q
 
   action {
     action   = "can_read"
-	resource = "Audit Logs"
-  } 
+    resource = "Audit Logs"
+  }
 }
 
 resource "airflow_user_roles" "test" {
-  username   = %[2]q
-  roles      = [airflow_role.test.name]
+  username = %[2]q
+  roles    = [airflow_role.test.name]
 }
 `, rName, accName)
 }
@@ -104,26 +111,26 @@ resource "airflow_user_roles" "test" {
 func testAccAirflowUserAddRolesConfigBasic(accName, rName, r2Name string) string {
 	return fmt.Sprintf(`
 resource "airflow_role" "test" {
-  name   = %[1]q
+  name = %[1]q
 
   action {
     action   = "can_read"
-	resource = "Audit Logs"
-  } 
+    resource = "Audit Logs"
+  }
 }
 
 resource "airflow_role" "test2" {
-  name   = %[2]q
+  name = %[2]q
 
   action {
     action   = "menu_access"
-	resource = "Audit Logs"
-  } 
+    resource = "Audit Logs"
+  }
 }
 
 resource "airflow_user_roles" "test" {
-  username   = %[3]q
-  roles      = [airflow_role.test.name, airflow_role.test2.name]
+  username = %[3]q
+  roles    = [airflow_role.test.name, airflow_role.test2.name]
 }
 `, rName, r2Name, accName)
 }
@@ -137,7 +144,7 @@ func testAccPreCheckCreateUser(t *testing.T) {
 	}
 
 	client := &http.Client{
-		Transport: logging.NewLoggingHTTPTransport(http.DefaultTransport),
+		Transport: http.DefaultTransport,
 	}
 	path := strings.TrimSuffix(u.Path, "/")
 	apiClient := airflow.NewAPIClient(&airflow.Configuration{
