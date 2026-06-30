@@ -6,7 +6,7 @@ import (
 	"net/http"
 
 	"github.com/apache/airflow-client-go/airflow"
-	"github.com/drfaust92/terraform-provider-airflow/internal/provider"
+	"github.com/drfaust92/terraform-provider-airflow/internal/client"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -27,7 +27,7 @@ func newVariableResource() resource.Resource {
 }
 
 type variableResource struct {
-	config provider.ProviderConfig
+	config client.ProviderConfig
 }
 
 type variableResourceModel struct {
@@ -77,11 +77,11 @@ func (r *variableResource) Configure(_ context.Context, req resource.ConfigureRe
 		return
 	}
 
-	cfg, ok := req.ProviderData.(provider.ProviderConfig)
+	cfg, ok := req.ProviderData.(client.ProviderConfig)
 	if !ok {
 		resp.Diagnostics.AddError(
 			"Unexpected Resource Configure Type",
-			fmt.Sprintf("Expected provider.ProviderConfig, got: %T. Please report this issue to the provider developers.", req.ProviderData),
+			fmt.Sprintf("Expected client.ProviderConfig, got: %T. Please report this issue to the provider developers.", req.ProviderData),
 		)
 		return
 	}

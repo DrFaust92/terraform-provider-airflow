@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/apache/airflow-client-go/airflow"
-	"github.com/drfaust92/terraform-provider-airflow/internal/provider"
+	"github.com/drfaust92/terraform-provider-airflow/internal/client"
 	"github.com/hashicorp/terraform-plugin-framework-jsontypes/jsontypes"
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
@@ -33,7 +33,7 @@ func newConnectionResource() resource.Resource {
 }
 
 type connectionResource struct {
-	config provider.ProviderConfig
+	config client.ProviderConfig
 }
 
 type connectionResourceModel struct {
@@ -139,11 +139,11 @@ func (r *connectionResource) Configure(_ context.Context, req resource.Configure
 		return
 	}
 
-	cfg, ok := req.ProviderData.(provider.ProviderConfig)
+	cfg, ok := req.ProviderData.(client.ProviderConfig)
 	if !ok {
 		resp.Diagnostics.AddError(
 			"Unexpected Resource Configure Type",
-			fmt.Sprintf("Expected provider.ProviderConfig, got: %T. Please report this issue to the provider developers.", req.ProviderData),
+			fmt.Sprintf("Expected client.ProviderConfig, got: %T. Please report this issue to the provider developers.", req.ProviderData),
 		)
 		return
 	}

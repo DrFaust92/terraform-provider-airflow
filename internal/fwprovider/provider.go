@@ -1,18 +1,12 @@
 // Package fwprovider holds the terraform-plugin-framework implementation of the
-// Airflow provider. Resources are migrated here one at a time from the SDKv2
-// provider (internal/provider) and the two are muxed together in main.go.
-//
-// The provider schema below must stay byte-for-byte equivalent (at the protocol
-// level) to the SDKv2 provider schema, otherwise tf6muxserver rejects the
-// combined server. Keep attribute names, types, and optional/required/sensitive
-// flags in sync with internal/provider/provider.go.
+// Airflow provider, which serves every resource.
 package fwprovider
 
 import (
 	"context"
 	"os"
 
-	"github.com/drfaust92/terraform-provider-airflow/internal/provider"
+	"github.com/drfaust92/terraform-provider-airflow/internal/client"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	fwprovider "github.com/hashicorp/terraform-plugin-framework/provider"
@@ -21,7 +15,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
-// defaultBasePath mirrors the SDKv2 AIRFLOW_API_BASE_PATH default.
+// defaultBasePath is the default AIRFLOW_API_BASE_PATH.
 const defaultBasePath = "/api/v1"
 
 var _ fwprovider.Provider = &airflowProvider{}
@@ -43,20 +37,13 @@ func (p *airflowProvider) Metadata(_ context.Context, _ fwprovider.MetadataReque
 }
 
 func (p *airflowProvider) Schema(_ context.Context, _ fwprovider.SchemaRequest, resp *fwprovider.SchemaResponse) {
-	// Mirror SDKv2's EnvDefaultFunc behaviour: a Required attribute whose
-	// DefaultFunc can supply a value is downgraded to Optional at the protocol
-	// level (helper/schema/core_schema.go), which means base_endpoint is
-	// Required when AIRFLOW_BASE_ENDPOINT is unset and Optional when it is set.
-	// The framework schema must track this so the muxed provider schemas stay
-	// identical in every environment. Presence is enforced in Configure.
-	baseEndpoint := schema.StringAttribute{Required: true}
-	if os.Getenv("AIRFLOW_BASE_ENDPOINT") != "" {
-		baseEndpoint = schema.StringAttribute{Optional: true}
-	}
-
 	resp.Schema = schema.Schema{
 		Attributes: map[string]schema.Attribute{
-			"base_endpoint": baseEndpoint,
+			// Optional so the endpoint may come from AIRFLOW_BASE_ENDPOINT;
+			// presence is enforced in Configure.
+			"base_endpoint": schema.StringAttribute{
+				Optional: true,
+			},
 			"oauth2_token": schema.StringAttribute{
 				Optional:    true,
 				Sensitive:   true,
@@ -124,7 +111,7 @@ func (p *airflowProvider) Configure(_ context.Context, req fwprovider.ConfigureR
 		return
 	}
 
-	cfg, err := provider.NewProviderConfig(endpoint, oauth2Token, username, password, disableSSL, basePath, sessionCookie)
+	cfg, err := client.NewProviderConfig(endpoint, oauth2Token, username, password, disableSSL, basePath, sessionCookie)
 	if err != nil {
 		resp.Diagnostics.AddError("Unable to configure Airflow API client", err.Error())
 		return

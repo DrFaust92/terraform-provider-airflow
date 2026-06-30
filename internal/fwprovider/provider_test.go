@@ -5,65 +5,24 @@ import (
 	"os"
 	"testing"
 
-	"github.com/drfaust92/terraform-provider-airflow/internal/provider"
+	fwprovider "github.com/hashicorp/terraform-plugin-framework/provider"
 	"github.com/hashicorp/terraform-plugin-framework/providerserver"
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
-	"github.com/hashicorp/terraform-plugin-mux/tf5to6server"
-	"github.com/hashicorp/terraform-plugin-mux/tf6muxserver"
 )
 
-// testAccProtoV6ProviderFactories serves the same muxed (SDKv2 + framework)
-// provider used by main.go, so acceptance tests exercise the real wiring.
+// testAccProtoV6ProviderFactories serves the framework provider for acceptance
+// tests.
 var testAccProtoV6ProviderFactories = map[string]func() (tfprotov6.ProviderServer, error){
-	"airflow": func() (tfprotov6.ProviderServer, error) {
-		ctx := context.Background()
-
-		upgraded, err := tf5to6server.UpgradeServer(ctx, provider.AirflowProvider().GRPCProvider)
-		if err != nil {
-			return nil, err
-		}
-
-		muxServer, err := tf6muxserver.NewMuxServer(ctx,
-			func() tfprotov6.ProviderServer { return upgraded },
-			providerserver.NewProtocol6(New("test")()),
-		)
-		if err != nil {
-			return nil, err
-		}
-
-		return muxServer.ProviderServer(), nil
-	},
+	"airflow": providerserver.NewProtocol6WithError(New("test")()),
 }
 
-// TestMuxServer asserts that the SDKv2 and framework providers can be muxed and
-// expose an identical provider schema. The schema-equality check runs when
-// GetProviderSchema is called (not at NewMuxServer time), so this test invokes
-// it explicitly and fails fast on any provider-schema drift. Runs without
-// TF_ACC.
-func TestMuxServer(t *testing.T) {
+// TestProvider validates that the provider schema builds without error.
+func TestProvider(t *testing.T) {
 	ctx := context.Background()
-
-	upgraded, err := tf5to6server.UpgradeServer(ctx, provider.AirflowProvider().GRPCProvider)
-	if err != nil {
-		t.Fatalf("error upgrading SDKv2 provider: %s", err)
-	}
-
-	muxServer, err := tf6muxserver.NewMuxServer(ctx,
-		func() tfprotov6.ProviderServer { return upgraded },
-		providerserver.NewProtocol6(New("test")()),
-	)
-	if err != nil {
-		t.Fatalf("error setting up muxed provider: %s", err)
-	}
-
-	schemaResp, err := muxServer.ProviderServer().GetProviderSchema(ctx, &tfprotov6.GetProviderSchemaRequest{})
-	if err != nil {
-		t.Fatalf("error retrieving provider schema: %s", err)
-	}
-	for _, d := range schemaResp.Diagnostics {
-		if d.Severity == tfprotov6.DiagnosticSeverityError {
-			t.Fatalf("provider schema diagnostic error: %s: %s", d.Summary, d.Detail)
-		}
+	resp := fwprovider.SchemaResponse{}
+	New("test")().Schema(ctx, fwprovider.SchemaRequest{}, &resp)
+	if resp.Diagnostics.HasError() {
+		t.Fatalf("provider schema diagnostics: %+v", resp.Diagnostics)
 	}
 }
 

@@ -6,7 +6,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/drfaust92/terraform-provider-airflow/internal/provider"
+	"github.com/drfaust92/terraform-provider-airflow/internal/client"
 	"github.com/hashicorp/terraform-plugin-testing/helper/acctest"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
@@ -117,8 +117,8 @@ func testAccCheckAirflowVariableCheckDestroy(s *terraform.State) error {
 
 // testAccProviderConfig builds an Airflow client from the acceptance-test
 // environment, for use in CheckDestroy outside the muxed provider lifecycle.
-func testAccProviderConfig() (provider.ProviderConfig, error) {
-	return provider.NewProviderConfig(
+func testAccProviderConfig() (client.ProviderConfig, error) {
+	return client.NewProviderConfig(
 		os.Getenv("AIRFLOW_BASE_ENDPOINT"),
 		os.Getenv("AIRFLOW_OAUTH2_TOKEN"),
 		os.Getenv("AIRFLOW_API_USERNAME"),
