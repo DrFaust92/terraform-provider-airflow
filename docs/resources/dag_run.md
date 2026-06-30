@@ -38,7 +38,7 @@ resource "airflow_dag_run" "example" {
 
 ### Read-Only
 
-- `id` (String) The ID of this resource.
+- `id` (String) The DAG run identifier in the form `dag_id:dag_run_id`.
 - `state` (String) The DAG state.
 
 <a id="nestedblock--timeouts"></a>
@@ -46,7 +46,7 @@ resource "airflow_dag_run" "example" {
 
 Optional:
 
-- `create` (String)
+- `create` (String) A string that can be [parsed as a duration](https://pkg.go.dev/time#ParseDuration) consisting of numbers and unit suffixes, such as "30s" or "2h45m". Valid time units are "s" (seconds), "m" (minutes), "h" (hours).
 
 ## Import
 

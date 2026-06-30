@@ -1,13 +1,13 @@
-package provider
+package fwprovider
 
 import (
 	"fmt"
 	"os"
 	"testing"
 
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/acctest"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/terraform"
+	"github.com/hashicorp/terraform-plugin-testing/helper/acctest"
+	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/hashicorp/terraform-plugin-testing/terraform"
 )
 
 var dagId = "example_bash_operator"
@@ -19,9 +19,9 @@ func TestAccAirflowDagRun_basic(t *testing.T) {
 
 	resourceName := "airflow_dag_run.test"
 	resource.Test(t, resource.TestCase{
-		PreCheck:     func() { testAccPreCheck(t) },
-		Providers:    testAccProviders,
-		CheckDestroy: testAccCheckAirflowDagRunCheckDestroy,
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckAirflowDagRunCheckDestroy,
 		Steps: []resource.TestStep{
 			{
 				Config: testAccAirflowDagRunConfigBasic(dagId),
@@ -50,9 +50,9 @@ func TestAccAirflowDagRun_dagRunId(t *testing.T) {
 
 	resourceName := "airflow_dag_run.test"
 	resource.Test(t, resource.TestCase{
-		PreCheck:     func() { testAccPreCheck(t) },
-		Providers:    testAccProviders,
-		CheckDestroy: testAccCheckAirflowDagRunCheckDestroy,
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckAirflowDagRunCheckDestroy,
 		Steps: []resource.TestStep{
 			{
 				Config: testAccAirflowDagRunConfigRunId(dagId, dagRunId),
@@ -78,9 +78,9 @@ func TestAccAirflowDagRun_conf(t *testing.T) {
 	}
 	resourceName := "airflow_dag_run.test"
 	resource.Test(t, resource.TestCase{
-		PreCheck:     func() { testAccPreCheck(t) },
-		Providers:    testAccProviders,
-		CheckDestroy: testAccCheckAirflowDagRunCheckDestroy,
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckAirflowDagRunCheckDestroy,
 		Steps: []resource.TestStep{
 			{
 				Config: testAccAirflowDagRunConfigConf(dagId),
@@ -101,21 +101,24 @@ func TestAccAirflowDagRun_conf(t *testing.T) {
 }
 
 func testAccCheckAirflowDagRunCheckDestroy(s *terraform.State) error {
-	client := testAccProvider.Meta().(ProviderConfig)
+	cfg, err := testAccProviderConfig()
+	if err != nil {
+		return err
+	}
 
 	for _, rs := range s.RootModule().Resources {
 		if rs.Type != "airflow_dag_run" {
 			continue
 		}
 
-		dagId, dagRunId, err := airflowDagRunId(rs.Primary.ID)
+		dagID, dagRunID, err := parseDagRunID(rs.Primary.ID)
 		if err != nil {
 			return err
 		}
 
-		dagRun, res, err := client.ApiClient.DAGRunApi.GetDagRun(client.AuthContext, dagId, dagRunId).Execute()
+		dagRun, res, err := cfg.ApiClient.DAGRunApi.GetDagRun(cfg.AuthContext, dagID, dagRunID).Execute()
 		if err == nil {
-			if *dagRun.DagRunId.Get() == dagRunId {
+			if dagRun.GetDagRunId() == dagRunID {
 				return fmt.Errorf("Airflow DagRun (%s) still exists.", rs.Primary.ID)
 			}
 		}
@@ -167,7 +170,7 @@ resource "airflow_dag_run" "test" {
 
   conf = {
     %[1]q = %[1]q
-  }  
+  }
 }
 `, dagId)
 }
