@@ -10,6 +10,142 @@ import (
 	"github.com/hashicorp/terraform-plugin-sdk/v2/terraform"
 )
 
+func TestSuppressSameJsonDiff(t *testing.T) {
+	cases := []struct {
+		name string
+		old  string
+		new  string
+		want bool
+	}{
+		{
+			name: "identical json",
+			old:  `{"api_key":"myapikey"}`,
+			new:  `{"api_key":"myapikey"}`,
+			want: true,
+		},
+		{
+			name: "same json different formatting",
+			old:  `{"api_key":"myapikey","host":"h"}`,
+			new:  `{ "host": "h", "api_key": "myapikey" }`,
+			want: true,
+		},
+		{
+			// API returns the masked placeholder for a secret-like key.
+			// State holds the real value, so the diff must be suppressed.
+			name: "masked value in new matches real value in old",
+			old:  `{"api_key":"myapikey"}`,
+			new:  `{"api_key":"***"}`,
+			want: true,
+		},
+		{
+			name: "masked value nested in object",
+			old:  `{"conn":{"api_key":"myapikey","host":"h"}}`,
+			new:  `{"conn":{"api_key":"***","host":"h"}}`,
+			want: true,
+		},
+		{
+			name: "masked value inside array",
+			old:  `{"keys":["myapikey","other"]}`,
+			new:  `{"keys":["***","other"]}`,
+			want: true,
+		},
+		{
+			// User changes the real secret: state and config both hold real
+			// (differing) values, so the diff must NOT be suppressed.
+			name: "real value change is not suppressed",
+			old:  `{"api_key":"oldkey"}`,
+			new:  `{"api_key":"newkey"}`,
+			want: false,
+		},
+		{
+			// A non-secret value change alongside an unrelated key must show.
+			name: "non-masked change is not suppressed",
+			old:  `{"api_key":"myapikey","host":"old"}`,
+			new:  `{"api_key":"***","host":"new"}`,
+			want: false,
+		},
+		{
+			name: "empty vs empty object equivalent",
+			old:  ``,
+			new:  `{}`,
+			want: true,
+		},
+		{
+			name: "empty object vs null equivalent",
+			old:  `{}`,
+			new:  `null`,
+			want: true,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := suppressSameJsonDiff("extra", tc.old, tc.new, nil)
+			if got != tc.want {
+				t.Errorf("suppressSameJsonDiff(old=%q, new=%q) = %v, want %v", tc.old, tc.new, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestConnectionPasswordDiffSuppress(t *testing.T) {
+	suppress := resourceConnection().Schema["password"].DiffSuppressFunc
+	if suppress == nil {
+		t.Fatal("expected password to have a DiffSuppressFunc")
+	}
+
+	cases := []struct {
+		name string
+		old  string
+		new  string
+		want bool
+	}{
+		{
+			// API returns masked placeholder, state has a real password:
+			// suppress so Terraform does not try to write "***" back.
+			name: "masked new with existing old",
+			old:  "realpass",
+			new:  "***",
+			want: true,
+		},
+		{
+			// No prior value: nothing to preserve, so do not suppress.
+			name: "masked new with empty old",
+			old:  "",
+			new:  "***",
+			want: false,
+		},
+		{
+			// User sets a real password: must not be suppressed.
+			name: "real new value",
+			old:  "***",
+			new:  "newpass",
+			want: false,
+		},
+		{
+			name: "identical real values",
+			old:  "samepass",
+			new:  "samepass",
+			want: false,
+		},
+		{
+			name: "empty new value",
+			old:  "realpass",
+			new:  "",
+			want: false,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := suppress("password", tc.old, tc.new, nil)
+			if got != tc.want {
+				t.Errorf("password DiffSuppressFunc(old=%q, new=%q) = %v, want %v", tc.old, tc.new, got, tc.want)
+			}
+		})
+	}
+}
+
 func TestAccAirflowConnection_basic(t *testing.T) {
 	rName := acctest.RandomWithPrefix("tf-acc-test")
 
