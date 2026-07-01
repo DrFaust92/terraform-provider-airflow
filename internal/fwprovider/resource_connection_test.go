@@ -296,6 +296,39 @@ func TestAccAirflowConnection_extraEquivalentJSON(t *testing.T) {
 	})
 }
 
+// TestAccAirflowConnection_extraMaskedSecret verifies idempotency when the
+// `extra` JSON contains a secret-like key (e.g. "api_key") that Airflow's
+// SecretsMasker returns masked as "***" on read. The real configured value must
+// be preserved in state so a subsequent plan is empty. See GH issue #34.
+func TestAccAirflowConnection_extraMaskedSecret(t *testing.T) {
+	rName := acctest.RandomWithPrefix("tf-acc-test")
+	resourceName := "airflow_connection.test"
+
+	extra := `{"api_key":"mysecretkey"}`
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckAirflowConnectionCheckDestroy,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccAirflowConnectionConfigExtra(rName, extra),
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr(resourceName, "connection_id", rName),
+					// The real secret value must be kept, not the masked "***".
+					resource.TestCheckResourceAttr(resourceName, "extra", extra),
+				),
+			},
+			{
+				// Re-plan with the same config: the API returns the masked value,
+				// but the provider must not surface a diff.
+				Config:   testAccAirflowConnectionConfigExtra(rName, extra),
+				PlanOnly: true,
+			},
+		},
+	})
+}
+
 // TestAccAirflowConnection_validation covers the framework validators on the
 // connection resource (config-time, no API calls): password/password_wo
 // conflict, the password_wo/password_wo_version co-requirement, and the port
