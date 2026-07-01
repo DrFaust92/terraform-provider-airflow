@@ -391,6 +391,11 @@ func (r *connectionResource) readInto(m *connectionResourceModel, diags *diag.Di
 		// Keep the configured/state value when it is semantically-equal JSON to
 		// what the API returns, so the post-apply value matches the plan
 		// (the API may reformat JSON).
+	case !m.Extra.IsNull() && jsonEqualIgnoringMasked(m.Extra.ValueString(), apiExtra):
+		// Airflow's SecretsMasker returns secret-like keys inside `extra` as
+		// masked placeholders (e.g. {"api_key":"***"}). When that masking is the
+		// only difference from state, keep the real state value so we neither
+		// persist "***" nor produce a perpetual diff. See GH issue #34.
 	case apiExtra != "":
 		m.Extra = types.StringValue(apiExtra)
 	case !m.Extra.IsNull():
@@ -457,4 +462,55 @@ func jsonSemanticEqual(a, b string) bool {
 		return false
 	}
 	return reflect.DeepEqual(av, bv)
+}
+
+// jsonEqualIgnoringMasked reports whether state and api are both valid JSON and
+// equal once masked placeholders in api (e.g. "***", returned by Airflow's
+// SecretsMasker for secret-like keys) are treated as equal to the corresponding
+// value in state. Non-JSON values are never equal here.
+func jsonEqualIgnoringMasked(state, api string) bool {
+	var sv, av interface{}
+	if json.Unmarshal([]byte(state), &sv) != nil || json.Unmarshal([]byte(api), &av) != nil {
+		return false
+	}
+	return reflect.DeepEqual(sv, unmaskAgainst(av, sv))
+}
+
+// unmaskAgainst returns a copy of api with every masked string leaf (non-empty
+// and consisting solely of '*') replaced by the corresponding value from state
+// when one is available, leaving all other values untouched.
+func unmaskAgainst(api, state interface{}) interface{} {
+	switch a := api.(type) {
+	case map[string]interface{}:
+		s, _ := state.(map[string]interface{})
+		out := make(map[string]interface{}, len(a))
+		for k, v := range a {
+			var sv interface{}
+			if s != nil {
+				sv = s[k]
+			}
+			out[k] = unmaskAgainst(v, sv)
+		}
+		return out
+	case []interface{}:
+		s, _ := state.([]interface{})
+		out := make([]interface{}, len(a))
+		for i, v := range a {
+			var sv interface{}
+			if s != nil && i < len(s) {
+				sv = s[i]
+			}
+			out[i] = unmaskAgainst(v, sv)
+		}
+		return out
+	case string:
+		if a != "" && strings.Trim(a, "*") == "" {
+			if s, ok := state.(string); ok && s != "" {
+				return s
+			}
+		}
+		return a
+	default:
+		return a
+	}
 }
