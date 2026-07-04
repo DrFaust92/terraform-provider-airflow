@@ -12,6 +12,8 @@ func TestProblemDetail(t *testing.T) {
 		name, body, want string
 	}{
 		{"rfc7807 detail", `{"detail":"Pool already exists","title":"Conflict","status":409}`, "Pool already exists"},
+		{"unauthenticated 401", `{"detail":"Not authenticated","status":401,"title":"Unauthorized"}`, "Not authenticated"},
+		{"permission denied 403", `{"detail":"The user does not have permission to perform this action","status":403,"title":"Forbidden"}`, "The user does not have permission to perform this action"},
 		{"title only", `{"title":"Bad Request","status":400}`, "Bad Request"},
 		{"non-json body", "boom, not json", "boom, not json"},
 		{"empty", "", ""},
