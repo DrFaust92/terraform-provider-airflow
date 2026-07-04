@@ -139,7 +139,12 @@ func (p *airflowProvider) Resources(_ context.Context) []func() resource.Resourc
 }
 
 func (p *airflowProvider) DataSources(_ context.Context) []func() datasource.DataSource {
-	return nil
+	return []func() datasource.DataSource{
+		newVariableDataSource,
+		newConnectionDataSource,
+		newPoolDataSource,
+		newDagDataSource,
+	}
 }
 
 // ListResources returns the resource types that support `terraform query` /
