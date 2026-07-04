@@ -40,6 +40,7 @@ resource "airflow_connection" "example" {
 - `password_wo_version` (String) Triggers update of password_wo write-only. For more info see [updating write-only attributes](https://developer.hashicorp.com/terraform/language/manage-sensitive-data/write-only)
 - `port` (Number) The port of the connection.
 - `schema` (String) The schema of the connection.
+- `team_name` (String) Team name for Airflow 3 multi-team deployments. Requires multi-team mode enabled and the team to exist; ignored on Airflow 2.
 
 ### Read-Only
 

@@ -43,6 +43,7 @@ type poolResourceModel struct {
 	Slots           types.Int64  `tfsdk:"slots"`
 	Description     types.String `tfsdk:"description"`
 	IncludeDeferred types.Bool   `tfsdk:"include_deferred"`
+	TeamName        types.String `tfsdk:"team_name"`
 	OccupiedSlots   types.Int64  `tfsdk:"occupied_slots"`
 	QueuedSlots     types.Int64  `tfsdk:"queued_slots"`
 	OpenSlots       types.Int64  `tfsdk:"open_slots"`
@@ -87,6 +88,11 @@ func (r *poolResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 				Optional:            true,
 				Computed:            true,
 				Default:             booldefault.StaticBool(false),
+			},
+			"team_name": schema.StringAttribute{
+				MarkdownDescription: "Team name for Airflow 3 multi-team deployments. Requires multi-team mode enabled and the team to exist; ignored on Airflow 2.",
+				Optional:            true,
+				Computed:            true,
 			},
 			"occupied_slots":  schema.Int64Attribute{MarkdownDescription: "The number of slots used.", Computed: true},
 			"queued_slots":    schema.Int64Attribute{MarkdownDescription: "The number of slots with queued tasks.", Computed: true},
@@ -141,6 +147,9 @@ func (r *poolResource) Create(ctx context.Context, req resource.CreateRequest, r
 	}
 	if !plan.Description.IsNull() && !plan.Description.IsUnknown() {
 		pool.SetDescription(plan.Description.ValueString())
+	}
+	if !plan.TeamName.IsNull() && !plan.TeamName.IsUnknown() {
+		pool.SetTeamName(plan.TeamName.ValueString())
 	}
 
 	_, httpResp, err := r.config.ApiClient.PoolApi.PostPool(r.config.AuthContext).Pool(pool).Execute()
@@ -203,6 +212,9 @@ func (r *poolResource) Update(ctx context.Context, req resource.UpdateRequest, r
 	} else {
 		pool.SetDescriptionNil()
 	}
+	if !plan.TeamName.IsNull() && !plan.TeamName.IsUnknown() {
+		pool.SetTeamName(plan.TeamName.ValueString())
+	}
 
 	_, httpResp, err := r.config.ApiClient.PoolApi.PatchPool(r.config.AuthContext, name).Pool(pool).Execute()
 	if err != nil {
@@ -259,6 +271,7 @@ func (r *poolResource) readInto(m *poolResourceModel, diags *diag.Diagnostics) (
 	m.Name = types.StringValue(pool.GetName())
 	m.Slots = types.Int64Value(int64(pool.GetSlots()))
 	m.IncludeDeferred = types.BoolValue(pool.GetIncludeDeferred())
+	m.TeamName = types.StringValue(pool.GetTeamName())
 	m.OccupiedSlots = types.Int64Value(int64(pool.GetOccupiedSlots()))
 	m.QueuedSlots = types.Int64Value(int64(pool.GetQueuedSlots()))
 	m.OpenSlots = types.Int64Value(int64(pool.GetOpenSlots()))
