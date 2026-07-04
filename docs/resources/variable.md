@@ -30,6 +30,7 @@ resource "airflow_variable" "example" {
 ### Optional
 
 - `description` (String) The variable description.
+- `team_name` (String) Team name for Airflow 3 multi-team deployments. Requires multi-team mode enabled and the team to exist; ignored on Airflow 2.
 
 ### Read-Only
 

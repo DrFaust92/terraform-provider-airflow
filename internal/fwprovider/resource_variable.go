@@ -42,6 +42,7 @@ type variableResourceModel struct {
 	Key         types.String `tfsdk:"key"`
 	Value       types.String `tfsdk:"value"`
 	Description types.String `tfsdk:"description"`
+	TeamName    types.String `tfsdk:"team_name"`
 }
 
 func (r *variableResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -72,6 +73,11 @@ func (r *variableResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 			},
 			"description": schema.StringAttribute{
 				MarkdownDescription: "The variable description.",
+				Optional:            true,
+				Computed:            true,
+			},
+			"team_name": schema.StringAttribute{
+				MarkdownDescription: "Team name for Airflow 3 multi-team deployments. Requires multi-team mode enabled and the team to exist; ignored on Airflow 2.",
 				Optional:            true,
 				Computed:            true,
 			},
@@ -122,6 +128,9 @@ func (r *variableResource) Create(ctx context.Context, req resource.CreateReques
 	}
 	if !plan.Description.IsNull() && !plan.Description.IsUnknown() {
 		variableReq.SetDescription(plan.Description.ValueString())
+	}
+	if !plan.TeamName.IsNull() && !plan.TeamName.IsUnknown() {
+		variableReq.SetTeamName(plan.TeamName.ValueString())
 	}
 
 	_, httpResp, err := r.config.ApiClient.VariableApi.PostVariables(r.config.AuthContext).Variable(variableReq).Execute()
@@ -182,6 +191,9 @@ func (r *variableResource) Update(ctx context.Context, req resource.UpdateReques
 	} else {
 		variableReq.SetDescription("")
 	}
+	if !plan.TeamName.IsNull() && !plan.TeamName.IsUnknown() {
+		variableReq.SetTeamName(plan.TeamName.ValueString())
+	}
 
 	_, httpResp, err := r.config.ApiClient.VariableApi.PatchVariable(r.config.AuthContext, key).Variable(variableReq).Execute()
 	if err != nil {
@@ -238,6 +250,7 @@ func (r *variableResource) readInto(m *variableResourceModel, diags *diag.Diagno
 	m.Key = types.StringValue(variable.GetKey())
 	m.Value = types.StringValue(variable.GetValue())
 	m.Description = types.StringValue(variable.GetDescription())
+	m.TeamName = types.StringValue(variable.GetTeamName())
 	return true
 }
 

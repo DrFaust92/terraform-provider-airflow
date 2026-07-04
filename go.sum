@@ -37,8 +37,8 @@ github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSs
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc h1:U9qPSI2PIWSS1VwoXQT9A3Wy9MM3WgvqSxFWenqJduM=
 github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
-github.com/drfaust92/airflow-client-go/airflow v0.0.0-20250103045940-da4c5c1666ad h1:5lZOEn4GPDtbuq5sKT4mBazqpYJiW8+T7OGiTKbunU0=
-github.com/drfaust92/airflow-client-go/airflow v0.0.0-20250103045940-da4c5c1666ad/go.mod h1:mY5OB6VEs5HWIXYjCaYJTR34CccC9uxbZxnKxl/3P28=
+github.com/drfaust92/airflow-client-go/airflow v0.0.0-20260704144150-84909d8bc79b h1:gZeOrt/1qPPRm6MgJLqzUqJPG7h5wBxxAfRvXP0Ky3Y=
+github.com/drfaust92/airflow-client-go/airflow v0.0.0-20260704144150-84909d8bc79b/go.mod h1:mY5OB6VEs5HWIXYjCaYJTR34CccC9uxbZxnKxl/3P28=
 github.com/emirpasic/gods v1.18.1 h1:FXtiHYKDGKCW2KzwZKx0iC0PQmdlorYgdFG9jPXJ1Bc=
 github.com/emirpasic/gods v1.18.1/go.mod h1:8tpGGwCnJ5H4r6BWwaV6OrWmMoPhUl5jm/FMNAnJvWQ=
 github.com/fatih/color v1.13.0/go.mod h1:kLAiJbzzSOZDVNGyDpeOxJ47H46qBXwg5ILebYFFOfk=

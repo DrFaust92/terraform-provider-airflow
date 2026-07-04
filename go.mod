@@ -88,4 +88,4 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
-replace github.com/apache/airflow-client-go/airflow => github.com/drfaust92/airflow-client-go/airflow v0.0.0-20250103045940-da4c5c1666ad
+replace github.com/apache/airflow-client-go/airflow => github.com/drfaust92/airflow-client-go/airflow v0.0.0-20260704144150-84909d8bc79b

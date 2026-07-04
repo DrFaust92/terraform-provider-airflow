@@ -31,6 +31,7 @@ resource "airflow_pool" "example" {
 
 - `description` (String) The description of the pool.
 - `include_deferred` (Boolean) Whether to include deferred tasks when calculating open pool slots.
+- `team_name` (String) Team name for Airflow 3 multi-team deployments. Requires multi-team mode enabled and the team to exist; ignored on Airflow 2.
 
 ### Read-Only
 

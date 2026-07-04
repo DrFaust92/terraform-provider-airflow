@@ -56,6 +56,7 @@ type connectionResourceModel struct {
 	PasswordWO        types.String `tfsdk:"password_wo"`
 	PasswordWOVersion types.String `tfsdk:"password_wo_version"`
 	Extra             types.String `tfsdk:"extra"`
+	TeamName          types.String `tfsdk:"team_name"`
 }
 
 func (r *connectionResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -139,6 +140,10 @@ func (r *connectionResource) Schema(_ context.Context, _ resource.SchemaRequest,
 					suppressEquivalentJSON{},
 				},
 			},
+			"team_name": schema.StringAttribute{
+				MarkdownDescription: "Team name for Airflow 3 multi-team deployments. Requires multi-team mode enabled and the team to exist; ignored on Airflow 2.",
+				Optional:            true,
+			},
 		},
 	}
 }
@@ -196,6 +201,9 @@ func (r *connectionResource) Create(ctx context.Context, req resource.CreateRequ
 	}
 	if !plan.Extra.IsNull() {
 		conn.SetExtra(plan.Extra.ValueString())
+	}
+	if !plan.TeamName.IsNull() && !plan.TeamName.IsUnknown() {
+		conn.SetTeamName(plan.TeamName.ValueString())
 	}
 
 	if pw := r.resolvePassword(ctx, plan.Password, req.Config, &resp.Diagnostics); pw != "" {
@@ -286,6 +294,9 @@ func (r *connectionResource) Update(ctx context.Context, req resource.UpdateRequ
 		conn.SetExtra(plan.Extra.ValueString())
 	} else {
 		conn.SetExtraNil()
+	}
+	if !plan.TeamName.IsNull() && !plan.TeamName.IsUnknown() {
+		conn.SetTeamName(plan.TeamName.ValueString())
 	}
 
 	if !plan.Password.IsNull() && plan.Password.ValueString() != "" {
@@ -378,6 +389,7 @@ func (r *connectionResource) readInto(m *connectionResourceModel, diags *diag.Di
 	setOptionalString(&m.Login, conn.GetLogin())
 	setOptionalString(&m.Schema, conn.GetSchema())
 	setOptionalString(&m.Description, conn.GetDescription())
+	setOptionalString(&m.TeamName, conn.GetTeamName())
 
 	if p := conn.GetPort(); p != 0 {
 		m.Port = types.Int64Value(int64(p))
