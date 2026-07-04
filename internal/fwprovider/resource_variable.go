@@ -1,7 +1,10 @@
 package fwprovider
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 
@@ -254,9 +257,55 @@ func (r *variableResource) readInto(m *variableResourceModel, diags *diag.Diagno
 	return true
 }
 
-func clientError(op, key string, httpResp *http.Response, err error) string {
+// clientError builds a diagnostic detail for a failed Airflow API call. The
+// resource type is already named in the diagnostic summary, so the detail only
+// carries the operation, the object id, the HTTP status, and -- crucially --
+// Airflow's own error message from the response body (see apiErrorDetail),
+// rather than just the bare HTTP status the client's error string exposes.
+func clientError(op, id string, httpResp *http.Response, err error) string {
+	msg := fmt.Sprintf("failed to %s %q", op, id)
 	if httpResp != nil {
-		return fmt.Sprintf("failed to %s variable %q, Status: %q from Airflow: %s", op, key, httpResp.Status, err)
+		msg += fmt.Sprintf(" (status %s)", httpResp.Status)
 	}
-	return fmt.Sprintf("failed to %s variable %q from Airflow: %s", op, key, err)
+	if detail := apiErrorDetail(err); detail != "" {
+		return msg + ": " + detail
+	}
+	if err != nil {
+		return msg + ": " + err.Error()
+	}
+	return msg
+}
+
+// apiErrorDetail extracts Airflow's error message from a client error. The
+// generated client's error string is only the HTTP status; the useful message
+// (RFC 7807 problem detail) is in the response body. Returns "" when absent.
+func apiErrorDetail(err error) string {
+	var apiErr *airflow.GenericOpenAPIError
+	if !errors.As(err, &apiErr) {
+		return ""
+	}
+	return problemDetail(apiErr.Body())
+}
+
+// problemDetail returns the human-readable message from an Airflow error
+// response body. Airflow uses RFC 7807 problem details, so prefer `detail`,
+// then `title`; fall back to the raw body for non-JSON payloads.
+func problemDetail(body []byte) string {
+	body = bytes.TrimSpace(body)
+	if len(body) == 0 {
+		return ""
+	}
+	var problem struct {
+		Detail string `json:"detail"`
+		Title  string `json:"title"`
+	}
+	if json.Unmarshal(body, &problem) == nil {
+		if problem.Detail != "" {
+			return problem.Detail
+		}
+		if problem.Title != "" {
+			return problem.Title
+		}
+	}
+	return string(body)
 }
