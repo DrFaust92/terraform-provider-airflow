@@ -2,12 +2,32 @@ package fwprovider
 
 import (
 	"fmt"
+	"regexp"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/acctest"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
 )
+
+// TestAccAirflowPool_errorSurfacesAPIMessage verifies that an Airflow API
+// failure surfaces as a clear, attributed error. "default_pool" always exists,
+// so creating it conflicts, exercising the client-error parsing path.
+func TestAccAirflowPool_errorSurfacesAPIMessage(t *testing.T) {
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: `resource "airflow_pool" "err" {
+  name  = "default_pool"
+  slots = 1
+}`,
+				ExpectError: regexp.MustCompile(`(?i)failed to create.*default_pool`),
+			},
+		},
+	})
+}
 
 func TestAccAirflowPool_basic(t *testing.T) {
 	rName := acctest.RandomWithPrefix("tf-acc-test")
