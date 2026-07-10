@@ -123,6 +123,9 @@ func (p *airflowProvider) Configure(_ context.Context, req fwprovider.ConfigureR
 
 	resp.ResourceData = cfg
 	resp.DataSourceData = cfg
+	// List resources receive their provider data from a separate field; without
+	// this they are never configured and panic on the first API call.
+	resp.ListResourceData = cfg
 }
 
 func (p *airflowProvider) Resources(_ context.Context) []func() resource.Resource {

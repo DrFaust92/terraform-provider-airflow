@@ -7,7 +7,10 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/acctest"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/hashicorp/terraform-plugin-testing/knownvalue"
+	"github.com/hashicorp/terraform-plugin-testing/querycheck"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
+	"github.com/hashicorp/terraform-plugin-testing/tfversion"
 )
 
 // TestAccAirflowPool_errorSurfacesAPIMessage verifies that an Airflow API
@@ -165,6 +168,42 @@ func testAccCheckAirflowPoolCheckDestroy(s *terraform.State) error {
 	}
 
 	return nil
+}
+
+// TestAccAirflowPool_list exercises the airflow_pool list resource: it creates a
+// pool, then runs a query and asserts the created pool appears in the results.
+// List/query resources require Terraform 1.14+, so the test skips below that.
+func TestAccAirflowPool_list(t *testing.T) {
+	rName := acctest.RandomWithPrefix("tf-acc-test")
+
+	resource.Test(t, resource.TestCase{
+		TerraformVersionChecks: []tfversion.TerraformVersionCheck{
+			tfversion.SkipBelow(tfversion.Version1_14_0),
+		},
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckAirflowPoolCheckDestroy,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccAirflowPoolConfigBasic(rName, 3),
+			},
+			{
+				Query: true,
+				Config: `
+provider "airflow" {}
+
+list "airflow_pool" "test" {
+  provider = airflow
+}
+`,
+				QueryResultChecks: []querycheck.QueryResultCheck{
+					querycheck.ExpectIdentity("airflow_pool.test", map[string]knownvalue.Check{
+						"id": knownvalue.StringExact(rName),
+					}),
+				},
+			},
+		},
+	})
 }
 
 func testAccAirflowPoolConfigBasic(rName string, slots int) string {
