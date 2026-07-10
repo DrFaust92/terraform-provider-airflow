@@ -3,12 +3,12 @@
 page_title: "airflow_pool List Resource - airflow"
 subcategory: ""
 description: |-
-  
+  Lists all Airflow pools. Use with terraform query (Terraform 1.14 and later) to enumerate existing pools.
 ---
 
 # airflow_pool (List Resource)
 
-
+Lists all Airflow pools. Use with `terraform query` (Terraform 1.14 and later) to enumerate existing pools.
 
 
 

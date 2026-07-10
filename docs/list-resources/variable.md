@@ -3,12 +3,12 @@
 page_title: "airflow_variable List Resource - airflow"
 subcategory: ""
 description: |-
-  
+  Lists all Airflow variables. Use with terraform query (Terraform 1.14 and later) to enumerate existing variables.
 ---
 
 # airflow_variable (List Resource)
 
-
+Lists all Airflow variables. Use with `terraform query` (Terraform 1.14 and later) to enumerate existing variables.
 
 
 

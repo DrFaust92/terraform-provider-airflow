@@ -31,7 +31,9 @@ func (r *variableListResource) Metadata(_ context.Context, req resource.Metadata
 
 func (r *variableListResource) ListResourceConfigSchema(_ context.Context, _ list.ListResourceSchemaRequest, resp *list.ListResourceSchemaResponse) {
 	// No filter arguments: list all variables.
-	resp.Schema = listschema.Schema{}
+	resp.Schema = listschema.Schema{
+		MarkdownDescription: "Lists all Airflow variables. Use with `terraform query` (Terraform 1.14 and later) to enumerate existing variables.",
+	}
 }
 
 func (r *variableListResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
