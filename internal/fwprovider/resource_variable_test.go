@@ -90,6 +90,37 @@ func TestAccAirflowVariable_desc(t *testing.T) {
 	})
 }
 
+// TestAccAirflowVariable_maskedSecret covers GH #83: Airflow's SecretsMasker
+// returns the value of a secret-like variable (key matching a sensitive
+// pattern) as "***" on read. The provider must keep the real state value
+// rather than persisting the mask, which otherwise causes an inconsistent
+// result after apply / a perpetual diff.
+func TestAccAirflowVariable_maskedSecret(t *testing.T) {
+	// A key containing "password" triggers Airflow's masking of the value.
+	rName := acctest.RandomWithPrefix("tf-acc-test") + "_password"
+	resourceName := "airflow_variable.test"
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckAirflowVariableCheckDestroy,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccAirflowVariableConfigBasic(rName, "supersecret"),
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr(resourceName, "key", rName),
+					resource.TestCheckResourceAttr(resourceName, "value", "supersecret"),
+				),
+			},
+			{
+				// Re-apply must be a no-op: the masked read-back must not diff.
+				Config:   testAccAirflowVariableConfigBasic(rName, "supersecret"),
+				PlanOnly: true,
+			},
+		},
+	})
+}
+
 func testAccCheckAirflowVariableCheckDestroy(s *terraform.State) error {
 	cfg, err := testAccProviderConfig()
 	if err != nil {
