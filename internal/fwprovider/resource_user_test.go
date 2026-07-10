@@ -182,7 +182,7 @@ resource "airflow_user" "test" {
   roles      = ["Admin"]
 }
 `, rName),
-				ExpectError: regexp.MustCompile(`Invalid Attribute Combination`),
+				ExpectError: regexp.MustCompile(`Exactly one of these attributes must be configured`),
 			},
 		},
 	})
