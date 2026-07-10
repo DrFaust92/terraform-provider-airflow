@@ -219,6 +219,49 @@ resource "airflow_connection" "test" {
 `, rName, password, passwordVersion)
 }
 
+// TestAccAirflowConnection_extraWO creates a connection with the write-only
+// extra_wo, asserts it is never persisted to state, and that bumping
+// extra_wo_version rotates it.
+func TestAccAirflowConnection_extraWO(t *testing.T) {
+	rName := acctest.RandomWithPrefix("tf-acc-test")
+
+	resourceName := "airflow_connection.test"
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckAirflowConnectionCheckDestroy,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccAirflowConnectionConfigExtraWO(rName, "a", 1),
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr(resourceName, "connection_id", rName),
+					resource.TestCheckResourceAttr(resourceName, "extra_wo_version", "1"),
+					// write-only value must never be persisted to state
+					resource.TestCheckNoResourceAttr(resourceName, "extra_wo"),
+				),
+			},
+			{
+				Config: testAccAirflowConnectionConfigExtraWO(rName, "b", 2),
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr(resourceName, "extra_wo_version", "2"),
+					resource.TestCheckNoResourceAttr(resourceName, "extra_wo"),
+				),
+			},
+		},
+	})
+}
+
+func testAccAirflowConnectionConfigExtraWO(rName, val string, extraVersion int) string {
+	return fmt.Sprintf(`
+resource "airflow_connection" "test" {
+  connection_id    = %[1]q
+  conn_type        = "http"
+  extra_wo         = jsonencode({ key = %[2]q })
+  extra_wo_version = %[3]d
+}
+`, rName, val, extraVersion)
+}
+
 // TestAccAirflowConnection_upgradeFromSDKv2 reproduces the regression where a
 // connection created by the SDKv2 provider (which stored an unset `extra` as "")
 // failed under the framework provider with "Invalid JSON String Value". Step 1
@@ -358,6 +401,18 @@ resource "airflow_connection" "test" {
   connection_id = %[1]q
   conn_type     = "http"
   password_wo   = "w"
+}
+`, rName),
+				ExpectError: regexp.MustCompile(`Invalid Attribute Combination`),
+			},
+			{
+				Config: fmt.Sprintf(`
+resource "airflow_connection" "test" {
+  connection_id    = %[1]q
+  conn_type        = "http"
+  extra            = jsonencode({ a = "b" })
+  extra_wo         = jsonencode({ a = "b" })
+  extra_wo_version = "1"
 }
 `, rName),
 				ExpectError: regexp.MustCompile(`Invalid Attribute Combination`),

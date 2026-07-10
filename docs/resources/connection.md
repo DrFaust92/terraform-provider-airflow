@@ -33,6 +33,8 @@ resource "airflow_connection" "example" {
 
 - `description` (String) The description of the connection.
 - `extra` (String, Sensitive) Other values that cannot be put into another field, e.g. RSA keys.
+- `extra_wo` (String, [Write-only](https://developer.hashicorp.com/terraform/language/resources/ephemeral#write-only-arguments)) Other values that cannot be put into another field, e.g. RSA keys. This field is write-only and is never stored in state. Requires Terraform 1.11 or later.
+- `extra_wo_version` (String) Triggers update of `extra_wo` write-only. For more info see [updating write-only attributes](https://developer.hashicorp.com/terraform/language/manage-sensitive-data/write-only).
 - `host` (String) The host of the connection.
 - `login` (String) The login of the connection.
 - `password` (String, Sensitive) The password of the connection.
