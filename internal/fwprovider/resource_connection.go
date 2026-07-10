@@ -56,6 +56,8 @@ type connectionResourceModel struct {
 	PasswordWO        types.String `tfsdk:"password_wo"`
 	PasswordWOVersion types.String `tfsdk:"password_wo_version"`
 	Extra             types.String `tfsdk:"extra"`
+	ExtraWO           types.String `tfsdk:"extra_wo"`
+	ExtraWOVersion    types.String `tfsdk:"extra_wo_version"`
 	TeamName          types.String `tfsdk:"team_name"`
 }
 
@@ -139,6 +141,25 @@ func (r *connectionResource) Schema(_ context.Context, _ resource.SchemaRequest,
 				PlanModifiers: []planmodifier.String{
 					suppressEquivalentJSON{},
 				},
+				Validators: []validator.String{
+					stringvalidator.ConflictsWith(path.MatchRoot("extra_wo")),
+				},
+			},
+			"extra_wo": schema.StringAttribute{
+				MarkdownDescription: "Other values that cannot be put into another field, e.g. RSA keys. This field is write-only and is never stored in state. Requires Terraform 1.11 or later.",
+				Optional:            true,
+				WriteOnly:           true,
+				Validators: []validator.String{
+					stringvalidator.ConflictsWith(path.MatchRoot("extra")),
+					stringvalidator.AlsoRequires(path.MatchRoot("extra_wo_version")),
+				},
+			},
+			"extra_wo_version": schema.StringAttribute{
+				MarkdownDescription: "Triggers update of `extra_wo` write-only. For more info see [updating write-only attributes](https://developer.hashicorp.com/terraform/language/manage-sensitive-data/write-only).",
+				Optional:            true,
+				Validators: []validator.String{
+					stringvalidator.AlsoRequires(path.MatchRoot("extra_wo")),
+				},
 			},
 			"team_name": schema.StringAttribute{
 				MarkdownDescription: "Team name for Airflow 3 multi-team deployments. Requires multi-team mode enabled and the team to exist; ignored on Airflow 2.",
@@ -199,8 +220,8 @@ func (r *connectionResource) Create(ctx context.Context, req resource.CreateRequ
 	if !plan.Port.IsNull() {
 		conn.SetPort(int32(plan.Port.ValueInt64()))
 	}
-	if !plan.Extra.IsNull() {
-		conn.SetExtra(plan.Extra.ValueString())
+	if e := r.resolveExtra(ctx, plan.Extra, req.Config, &resp.Diagnostics); e != "" {
+		conn.SetExtra(e)
 	}
 	if !plan.TeamName.IsNull() && !plan.TeamName.IsUnknown() {
 		conn.SetTeamName(plan.TeamName.ValueString())
@@ -292,6 +313,14 @@ func (r *connectionResource) Update(ctx context.Context, req resource.UpdateRequ
 	}
 	if !plan.Extra.IsNull() {
 		conn.SetExtra(plan.Extra.ValueString())
+	} else if !plan.ExtraWOVersion.IsNull() {
+		// Write-only extra: only re-send on a version bump; otherwise leave the
+		// stored extra untouched (do not clear it).
+		if !plan.ExtraWOVersion.Equal(state.ExtraWOVersion) {
+			if e := r.writeOnlyExtra(ctx, req.Config, &resp.Diagnostics); e != "" {
+				conn.SetExtra(e)
+			}
+		}
 	} else {
 		conn.SetExtraNil()
 	}
@@ -367,6 +396,25 @@ func (r *connectionResource) writeOnlyPassword(ctx context.Context, config tfsdk
 	return pwWO.ValueString()
 }
 
+// resolveExtra returns the extra to send on create: the configured extra if
+// set, otherwise the write-only extra_wo value.
+func (r *connectionResource) resolveExtra(ctx context.Context, extra types.String, config tfsdk.Config, diags *diag.Diagnostics) string {
+	if !extra.IsNull() && extra.ValueString() != "" {
+		return extra.ValueString()
+	}
+	return r.writeOnlyExtra(ctx, config, diags)
+}
+
+// writeOnlyExtra reads the write-only extra_wo attribute from config.
+func (r *connectionResource) writeOnlyExtra(ctx context.Context, config tfsdk.Config, diags *diag.Diagnostics) string {
+	var eWO types.String
+	diags.Append(config.GetAttribute(ctx, path.Root("extra_wo"), &eWO)...)
+	if diags.HasError() || eWO.IsNull() || eWO.IsUnknown() {
+		return ""
+	}
+	return eWO.ValueString()
+}
+
 // readInto fetches the connection identified by m.ID and populates m. Optional
 // attributes preserve their null-ness when the API returns an empty value, and
 // the password is preserved when the API hides it (absent or masked). Returns
@@ -397,21 +445,25 @@ func (r *connectionResource) readInto(m *connectionResourceModel, diags *diag.Di
 		m.Port = types.Int64Value(0)
 	}
 
-	apiExtra := conn.GetExtra()
-	switch {
-	case !m.Extra.IsNull() && jsonSemanticEqual(m.Extra.ValueString(), apiExtra):
-		// Keep the configured/state value when it is semantically-equal JSON to
-		// what the API returns, so the post-apply value matches the plan
-		// (the API may reformat JSON).
-	case !m.Extra.IsNull() && jsonEqualIgnoringMasked(m.Extra.ValueString(), apiExtra):
-		// Airflow's SecretsMasker returns secret-like keys inside `extra` as
-		// masked placeholders (e.g. {"api_key":"***"}). When that masking is the
-		// only difference from state, keep the real state value so we neither
-		// persist "***" nor produce a perpetual diff. See GH issue #34.
-	case apiExtra != "":
-		m.Extra = types.StringValue(apiExtra)
-	case !m.Extra.IsNull():
-		m.Extra = types.StringValue("")
+	// In write-only mode (extra_wo_version set) `extra` came from the write-only
+	// extra_wo and must not be persisted to state, so skip reading it back.
+	if m.ExtraWOVersion.IsNull() {
+		apiExtra := conn.GetExtra()
+		switch {
+		case !m.Extra.IsNull() && jsonSemanticEqual(m.Extra.ValueString(), apiExtra):
+			// Keep the configured/state value when it is semantically-equal JSON to
+			// what the API returns, so the post-apply value matches the plan
+			// (the API may reformat JSON).
+		case !m.Extra.IsNull() && jsonEqualIgnoringMasked(m.Extra.ValueString(), apiExtra):
+			// Airflow's SecretsMasker returns secret-like keys inside `extra` as
+			// masked placeholders (e.g. {"api_key":"***"}). When that masking is the
+			// only difference from state, keep the real state value so we neither
+			// persist "***" nor produce a perpetual diff. See GH issue #34.
+		case apiExtra != "":
+			m.Extra = types.StringValue(apiExtra)
+		case !m.Extra.IsNull():
+			m.Extra = types.StringValue("")
+		}
 	}
 
 	// Preserve the configured password unless the API returns a real
