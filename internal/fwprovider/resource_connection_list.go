@@ -30,7 +30,9 @@ func (r *connectionListResource) Metadata(_ context.Context, req resource.Metada
 }
 
 func (r *connectionListResource) ListResourceConfigSchema(_ context.Context, _ list.ListResourceSchemaRequest, resp *list.ListResourceSchemaResponse) {
-	resp.Schema = listschema.Schema{}
+	resp.Schema = listschema.Schema{
+		MarkdownDescription: "Lists all Airflow connections. Use with `terraform query` (Terraform 1.14 and later) to enumerate existing connections.",
+	}
 }
 
 func (r *connectionListResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {

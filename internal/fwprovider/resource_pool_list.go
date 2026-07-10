@@ -30,7 +30,9 @@ func (r *poolListResource) Metadata(_ context.Context, req resource.MetadataRequ
 }
 
 func (r *poolListResource) ListResourceConfigSchema(_ context.Context, _ list.ListResourceSchemaRequest, resp *list.ListResourceSchemaResponse) {
-	resp.Schema = listschema.Schema{}
+	resp.Schema = listschema.Schema{
+		MarkdownDescription: "Lists all Airflow pools. Use with `terraform query` (Terraform 1.14 and later) to enumerate existing pools.",
+	}
 }
 
 func (r *poolListResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {

@@ -3,12 +3,12 @@
 page_title: "airflow_connection List Resource - airflow"
 subcategory: ""
 description: |-
-  
+  Lists all Airflow connections. Use with terraform query (Terraform 1.14 and later) to enumerate existing connections.
 ---
 
 # airflow_connection (List Resource)
 
-
+Lists all Airflow connections. Use with `terraform query` (Terraform 1.14 and later) to enumerate existing connections.
 
 
 
