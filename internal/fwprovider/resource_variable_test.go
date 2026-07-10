@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"fmt"
 	"os"
+	"regexp"
 	"testing"
 
 	"github.com/drfaust92/terraform-provider-airflow/internal/client"
@@ -127,6 +128,82 @@ func testAccProviderConfig() (client.ProviderConfig, error) {
 		cmp.Or(os.Getenv("AIRFLOW_API_BASE_PATH"), defaultBasePath),
 		os.Getenv("AIRFLOW_SESSION_COOKIE"),
 	)
+}
+
+// TestAccAirflowVariable_valueWO creates a variable with the write-only
+// value_wo, asserts neither the write-only value nor the plain value is
+// persisted to state, and that bumping value_wo_version rotates it.
+func TestAccAirflowVariable_valueWO(t *testing.T) {
+	rName := acctest.RandomWithPrefix("tf-acc-test")
+	resourceName := "airflow_variable.test"
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckAirflowVariableCheckDestroy,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccAirflowVariableConfigValueWO(rName, "secret1", 1),
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr(resourceName, "key", rName),
+					resource.TestCheckResourceAttr(resourceName, "value_wo_version", "1"),
+					resource.TestCheckNoResourceAttr(resourceName, "value_wo"),
+					// the secret must not be persisted via value either
+					resource.TestCheckNoResourceAttr(resourceName, "value"),
+				),
+			},
+			{
+				Config: testAccAirflowVariableConfigValueWO(rName, "secret2", 2),
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr(resourceName, "value_wo_version", "2"),
+					resource.TestCheckNoResourceAttr(resourceName, "value_wo"),
+					resource.TestCheckNoResourceAttr(resourceName, "value"),
+				),
+			},
+		},
+	})
+}
+
+// TestAccAirflowVariable_validation covers the config-time validators: exactly
+// one of value / value_wo must be set.
+func TestAccAirflowVariable_validation(t *testing.T) {
+	rName := acctest.RandomWithPrefix("tf-acc-test")
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: fmt.Sprintf(`
+resource "airflow_variable" "test" {
+  key              = %[1]q
+  value            = "v"
+  value_wo         = "w"
+  value_wo_version = "1"
+}
+`, rName),
+				ExpectError: regexp.MustCompile(`Invalid Attribute Combination`),
+			},
+			{
+				Config: fmt.Sprintf(`
+resource "airflow_variable" "test" {
+  key = %[1]q
+}
+`, rName),
+				ExpectError: regexp.MustCompile(`Exactly one of these attributes must be configured`),
+			},
+		},
+	})
+}
+
+func testAccAirflowVariableConfigValueWO(rName, value string, version int) string {
+	return fmt.Sprintf(`
+resource "airflow_variable" "test" {
+  key              = %[1]q
+  value_wo         = %[2]q
+  value_wo_version = %[3]d
+}
+`, rName, value, version)
 }
 
 func testAccAirflowVariableConfigBasic(rName, value string) string {

@@ -25,12 +25,16 @@ resource "airflow_variable" "example" {
 ### Required
 
 - `key` (String) The variable key.
-- `value` (String) The variable value.
 
 ### Optional
 
+> **NOTE**: [Write-only arguments](https://developer.hashicorp.com/terraform/language/resources/ephemeral#write-only-arguments) are supported in Terraform 1.11 and later.
+
 - `description` (String) The variable description.
 - `team_name` (String) Team name for Airflow 3 multi-team deployments. Requires multi-team mode enabled and the team to exist; ignored on Airflow 2.
+- `value` (String, Sensitive) The variable value. Exactly one of `value` or `value_wo` must be set.
+- `value_wo` (String, [Write-only](https://developer.hashicorp.com/terraform/language/resources/ephemeral#write-only-arguments)) The variable value. This field is write-only and is never stored in state. Requires Terraform 1.11 or later.
+- `value_wo_version` (String) Triggers update of `value_wo` write-only. For more info see [updating write-only attributes](https://developer.hashicorp.com/terraform/language/manage-sensitive-data/write-only).
 
 ### Read-Only
 
