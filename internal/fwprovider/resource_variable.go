@@ -10,6 +10,8 @@ import (
 
 	"github.com/apache/airflow-client-go/airflow"
 	"github.com/drfaust92/terraform-provider-airflow/internal/client"
+	"github.com/hashicorp/terraform-plugin-framework-validators/resourcevalidator"
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -17,14 +19,17 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
+	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
 var (
-	_ resource.Resource                = &variableResource{}
-	_ resource.ResourceWithConfigure   = &variableResource{}
-	_ resource.ResourceWithImportState = &variableResource{}
-	_ resource.ResourceWithIdentity    = &variableResource{}
+	_ resource.Resource                     = &variableResource{}
+	_ resource.ResourceWithConfigure        = &variableResource{}
+	_ resource.ResourceWithImportState      = &variableResource{}
+	_ resource.ResourceWithIdentity         = &variableResource{}
+	_ resource.ResourceWithConfigValidators = &variableResource{}
 )
 
 // variableIdentityModel is the resource identity for airflow_variable (its key).
@@ -41,11 +46,13 @@ type variableResource struct {
 }
 
 type variableResourceModel struct {
-	ID          types.String `tfsdk:"id"`
-	Key         types.String `tfsdk:"key"`
-	Value       types.String `tfsdk:"value"`
-	Description types.String `tfsdk:"description"`
-	TeamName    types.String `tfsdk:"team_name"`
+	ID             types.String `tfsdk:"id"`
+	Key            types.String `tfsdk:"key"`
+	Value          types.String `tfsdk:"value"`
+	ValueWO        types.String `tfsdk:"value_wo"`
+	ValueWOVersion types.String `tfsdk:"value_wo_version"`
+	Description    types.String `tfsdk:"description"`
+	TeamName       types.String `tfsdk:"team_name"`
 }
 
 func (r *variableResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -71,8 +78,28 @@ func (r *variableResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 				},
 			},
 			"value": schema.StringAttribute{
-				MarkdownDescription: "The variable value.",
-				Required:            true,
+				MarkdownDescription: "The variable value. Exactly one of `value` or `value_wo` must be set.",
+				Optional:            true,
+				Sensitive:           true,
+				Validators: []validator.String{
+					stringvalidator.ConflictsWith(path.MatchRoot("value_wo")),
+				},
+			},
+			"value_wo": schema.StringAttribute{
+				MarkdownDescription: "The variable value. This field is write-only and is never stored in state. Requires Terraform 1.11 or later.",
+				Optional:            true,
+				WriteOnly:           true,
+				Validators: []validator.String{
+					stringvalidator.ConflictsWith(path.MatchRoot("value")),
+					stringvalidator.AlsoRequires(path.MatchRoot("value_wo_version")),
+				},
+			},
+			"value_wo_version": schema.StringAttribute{
+				MarkdownDescription: "Triggers update of `value_wo` write-only. For more info see [updating write-only attributes](https://developer.hashicorp.com/terraform/language/manage-sensitive-data/write-only).",
+				Optional:            true,
+				Validators: []validator.String{
+					stringvalidator.AlsoRequires(path.MatchRoot("value_wo")),
+				},
 			},
 			"description": schema.StringAttribute{
 				MarkdownDescription: "The variable description.",
@@ -115,6 +142,29 @@ func (r *variableResource) Configure(_ context.Context, req resource.ConfigureRe
 	r.config = cfg
 }
 
+func (r *variableResource) ConfigValidators(_ context.Context) []resource.ConfigValidator {
+	return []resource.ConfigValidator{
+		resourcevalidator.ExactlyOneOf(
+			path.MatchRoot("value"),
+			path.MatchRoot("value_wo"),
+		),
+	}
+}
+
+// resolveValue returns the value to send: the configured value if set,
+// otherwise the write-only value_wo value from config.
+func (r *variableResource) resolveValue(ctx context.Context, value types.String, config tfsdk.Config, diags *diag.Diagnostics) string {
+	if !value.IsNull() && value.ValueString() != "" {
+		return value.ValueString()
+	}
+	var vWO types.String
+	diags.Append(config.GetAttribute(ctx, path.Root("value_wo"), &vWO)...)
+	if diags.HasError() || vWO.IsNull() || vWO.IsUnknown() {
+		return ""
+	}
+	return vWO.ValueString()
+}
+
 func (r *variableResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	var plan variableResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
@@ -123,7 +173,10 @@ func (r *variableResource) Create(ctx context.Context, req resource.CreateReques
 	}
 
 	key := plan.Key.ValueString()
-	val := plan.Value.ValueString()
+	val := r.resolveValue(ctx, plan.Value, req.Config, &resp.Diagnostics)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 
 	variableReq := airflow.Variable{
 		Key:   &key,
@@ -182,7 +235,10 @@ func (r *variableResource) Update(ctx context.Context, req resource.UpdateReques
 	}
 
 	key := plan.ID.ValueString()
-	val := plan.Value.ValueString()
+	val := r.resolveValue(ctx, plan.Value, req.Config, &resp.Diagnostics)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 
 	variableReq := airflow.Variable{
 		Key:   &key,
@@ -251,7 +307,12 @@ func (r *variableResource) readInto(m *variableResourceModel, diags *diag.Diagno
 	}
 
 	m.Key = types.StringValue(variable.GetKey())
-	m.Value = types.StringValue(variable.GetValue())
+	// In write-only mode (value_wo_version set) the value came from the
+	// write-only value_wo and must not be persisted to state, so skip reading it
+	// back from the API. Otherwise refresh value from the API as before.
+	if m.ValueWOVersion.IsNull() {
+		m.Value = types.StringValue(variable.GetValue())
+	}
 	m.Description = types.StringValue(variable.GetDescription())
 	m.TeamName = types.StringValue(variable.GetTeamName())
 	return true
