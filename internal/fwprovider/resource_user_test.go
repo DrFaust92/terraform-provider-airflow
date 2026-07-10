@@ -3,6 +3,7 @@ package fwprovider
 import (
 	"fmt"
 	"os"
+	"regexp"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/acctest"
@@ -110,6 +111,104 @@ resource "airflow_user" "test" {
   roles      = [airflow_role.test.name]
 }
 `, rName, fName)
+}
+
+// TestAccAirflowUser_passwordWO creates a user with the write-only password_wo,
+// asserts the secret is never persisted to state, and that bumping
+// password_wo_version rotates it (triggers an update).
+func TestAccAirflowUser_passwordWO(t *testing.T) {
+	if os.Getenv("SKIP_AIRFLOW_USER_ROLES_TESTS") == "true" {
+		t.Skip("Skipping Airflow Roles and User Tests")
+	}
+	rName := acctest.RandomWithPrefix("tf-acc-test")
+	resourceName := "airflow_user.test"
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckAirflowUserCheckDestroy,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccAirflowUserConfigPasswordWO(rName, "Mustbe8characters", 1),
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr(resourceName, "username", rName),
+					resource.TestCheckResourceAttr(resourceName, "password_wo_version", "1"),
+					// write-only value must never be persisted to state
+					resource.TestCheckNoResourceAttr(resourceName, "password_wo"),
+				),
+			},
+			{
+				Config: testAccAirflowUserConfigPasswordWO(rName, "Mustbe8charactersupdated", 2),
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr(resourceName, "password_wo_version", "2"),
+					resource.TestCheckNoResourceAttr(resourceName, "password_wo"),
+				),
+			},
+		},
+	})
+}
+
+// TestAccAirflowUser_validation covers the config-time validators: exactly one
+// of password / password_wo must be set.
+func TestAccAirflowUser_validation(t *testing.T) {
+	rName := acctest.RandomWithPrefix("tf-acc-test")
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: fmt.Sprintf(`
+resource "airflow_user" "test" {
+  email               = %[1]q
+  first_name          = %[1]q
+  last_name           = %[1]q
+  username            = %[1]q
+  password            = "p"
+  password_wo         = "w"
+  password_wo_version = "1"
+  roles               = ["Admin"]
+}
+`, rName),
+				ExpectError: regexp.MustCompile(`Invalid Attribute Combination`),
+			},
+			{
+				Config: fmt.Sprintf(`
+resource "airflow_user" "test" {
+  email      = %[1]q
+  first_name = %[1]q
+  last_name  = %[1]q
+  username   = %[1]q
+  roles      = ["Admin"]
+}
+`, rName),
+				ExpectError: regexp.MustCompile(`Exactly one of these attributes must be configured`),
+			},
+		},
+	})
+}
+
+func testAccAirflowUserConfigPasswordWO(rName, password string, version int) string {
+	return fmt.Sprintf(`
+resource "airflow_role" "test" {
+  name = %[1]q
+
+  action {
+    action   = "can_read"
+    resource = "Audit Logs"
+  }
+}
+
+resource "airflow_user" "test" {
+  email               = %[1]q
+  first_name          = %[1]q
+  last_name           = %[1]q
+  username            = %[1]q
+  password_wo         = %[2]q
+  password_wo_version = %[3]d
+  roles               = [airflow_role.test.name]
+}
+`, rName, password, version)
 }
 
 // TestAccAirflowUser_upgradeFromSDKv2 guards the SDKv2 -> framework upgrade path

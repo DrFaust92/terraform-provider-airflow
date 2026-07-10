@@ -31,9 +31,16 @@ resource "airflow_user" "example" {
 - `email` (String) The user's email.
 - `first_name` (String) The user firstname.
 - `last_name` (String) The user lastname.
-- `password` (String, Sensitive) The user password.
 - `roles` (Set of String) A set of User roles to attach to the User.
 - `username` (String) The username.
+
+### Optional
+
+> **NOTE**: [Write-only arguments](https://developer.hashicorp.com/terraform/language/resources/ephemeral#write-only-arguments) are supported in Terraform 1.11 and later.
+
+- `password` (String, Sensitive) The user password. Exactly one of `password` or `password_wo` must be set.
+- `password_wo` (String, [Write-only](https://developer.hashicorp.com/terraform/language/resources/ephemeral#write-only-arguments)) The user password. This field is write-only and is never stored in state. Requires Terraform 1.11 or later.
+- `password_wo_version` (String) Triggers update of `password_wo` write-only. For more info see [updating write-only attributes](https://developer.hashicorp.com/terraform/language/manage-sensitive-data/write-only).
 
 ### Read-Only
 

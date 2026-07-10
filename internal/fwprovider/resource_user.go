@@ -7,7 +7,9 @@ import (
 
 	"github.com/apache/airflow-client-go/airflow"
 	"github.com/drfaust92/terraform-provider-airflow/internal/client"
+	"github.com/hashicorp/terraform-plugin-framework-validators/resourcevalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/setvalidator"
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -15,13 +17,15 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
+	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
 var (
-	_ resource.Resource                = &userResource{}
-	_ resource.ResourceWithConfigure   = &userResource{}
-	_ resource.ResourceWithImportState = &userResource{}
+	_ resource.Resource                     = &userResource{}
+	_ resource.ResourceWithConfigure        = &userResource{}
+	_ resource.ResourceWithImportState      = &userResource{}
+	_ resource.ResourceWithConfigValidators = &userResource{}
 )
 
 func newUserResource() resource.Resource {
@@ -33,16 +37,18 @@ type userResource struct {
 }
 
 type userResourceModel struct {
-	ID               types.String `tfsdk:"id"`
-	Active           types.Bool   `tfsdk:"active"`
-	Email            types.String `tfsdk:"email"`
-	FailedLoginCount types.Int64  `tfsdk:"failed_login_count"`
-	FirstName        types.String `tfsdk:"first_name"`
-	LastName         types.String `tfsdk:"last_name"`
-	LoginCount       types.String `tfsdk:"login_count"`
-	Roles            []string     `tfsdk:"roles"`
-	Username         types.String `tfsdk:"username"`
-	Password         types.String `tfsdk:"password"`
+	ID                types.String `tfsdk:"id"`
+	Active            types.Bool   `tfsdk:"active"`
+	Email             types.String `tfsdk:"email"`
+	FailedLoginCount  types.Int64  `tfsdk:"failed_login_count"`
+	FirstName         types.String `tfsdk:"first_name"`
+	LastName          types.String `tfsdk:"last_name"`
+	LoginCount        types.String `tfsdk:"login_count"`
+	Roles             []string     `tfsdk:"roles"`
+	Username          types.String `tfsdk:"username"`
+	Password          types.String `tfsdk:"password"`
+	PasswordWO        types.String `tfsdk:"password_wo"`
+	PasswordWOVersion types.String `tfsdk:"password_wo_version"`
 }
 
 func (r *userResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -103,12 +109,54 @@ func (r *userResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 				},
 			},
 			"password": schema.StringAttribute{
-				MarkdownDescription: "The user password.",
-				Required:            true,
+				MarkdownDescription: "The user password. Exactly one of `password` or `password_wo` must be set.",
+				Optional:            true,
 				Sensitive:           true,
+				Validators: []validator.String{
+					stringvalidator.ConflictsWith(path.MatchRoot("password_wo")),
+				},
+			},
+			"password_wo": schema.StringAttribute{
+				MarkdownDescription: "The user password. This field is write-only and is never stored in state. Requires Terraform 1.11 or later.",
+				Optional:            true,
+				WriteOnly:           true,
+				Validators: []validator.String{
+					stringvalidator.ConflictsWith(path.MatchRoot("password")),
+					stringvalidator.AlsoRequires(path.MatchRoot("password_wo_version")),
+				},
+			},
+			"password_wo_version": schema.StringAttribute{
+				MarkdownDescription: "Triggers update of `password_wo` write-only. For more info see [updating write-only attributes](https://developer.hashicorp.com/terraform/language/manage-sensitive-data/write-only).",
+				Optional:            true,
+				Validators: []validator.String{
+					stringvalidator.AlsoRequires(path.MatchRoot("password_wo")),
+				},
 			},
 		},
 	}
+}
+
+func (r *userResource) ConfigValidators(_ context.Context) []resource.ConfigValidator {
+	return []resource.ConfigValidator{
+		resourcevalidator.ExactlyOneOf(
+			path.MatchRoot("password"),
+			path.MatchRoot("password_wo"),
+		),
+	}
+}
+
+// resolvePassword returns the password to send: the configured password if set,
+// otherwise the write-only password_wo value from config.
+func (r *userResource) resolvePassword(ctx context.Context, password types.String, config tfsdk.Config, diags *diag.Diagnostics) string {
+	if !password.IsNull() && password.ValueString() != "" {
+		return password.ValueString()
+	}
+	var pwWO types.String
+	diags.Append(config.GetAttribute(ctx, path.Root("password_wo"), &pwWO)...)
+	if diags.HasError() || pwWO.IsNull() || pwWO.IsUnknown() {
+		return ""
+	}
+	return pwWO.ValueString()
 }
 
 func (r *userResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
@@ -139,7 +187,10 @@ func (r *userResource) Create(ctx context.Context, req resource.CreateRequest, r
 	firstName := plan.FirstName.ValueString()
 	lastName := plan.LastName.ValueString()
 	username := plan.Username.ValueString()
-	password := plan.Password.ValueString()
+	password := r.resolvePassword(ctx, plan.Password, req.Config, &resp.Diagnostics)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 
 	_, httpResp, err := r.config.ApiClient.UserApi.PostUser(r.config.AuthContext).User(airflow.User{
 		Email:     &email,
@@ -185,8 +236,9 @@ func (r *userResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 }
 
 func (r *userResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	var plan userResourceModel
+	var plan, state userResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -194,14 +246,29 @@ func (r *userResource) Update(ctx context.Context, req resource.UpdateRequest, r
 	email := plan.Email.ValueString()
 	firstName := plan.FirstName.ValueString()
 	lastName := plan.LastName.ValueString()
-	password := plan.Password.ValueString()
 	username := plan.ID.ValueString()
+
+	// Only send the password when it actually changed: a configured `password`,
+	// or a `password_wo` rotation signalled by a bumped password_wo_version.
+	// Otherwise leave it nil so the existing password is preserved.
+	var passwordPtr *string
+	if !plan.Password.IsNull() && plan.Password.ValueString() != "" {
+		pw := plan.Password.ValueString()
+		passwordPtr = &pw
+	} else if !plan.PasswordWOVersion.Equal(state.PasswordWOVersion) {
+		if pw := r.resolvePassword(ctx, plan.Password, req.Config, &resp.Diagnostics); pw != "" {
+			passwordPtr = &pw
+		}
+	}
+	if resp.Diagnostics.HasError() {
+		return
+	}
 
 	_, httpResp, err := r.config.ApiClient.UserApi.PatchUser(r.config.AuthContext, username).User(airflow.User{
 		Email:     &email,
 		FirstName: &firstName,
 		LastName:  &lastName,
-		Password:  &password,
+		Password:  passwordPtr,
 		Roles:     expandUserRoles(plan.Roles),
 		Username:  &username,
 	}).Execute()
