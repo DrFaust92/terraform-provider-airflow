@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/apache/airflow-client-go/airflow"
 	"github.com/drfaust92/terraform-provider-airflow/internal/client"
@@ -311,11 +312,26 @@ func (r *variableResource) readInto(m *variableResourceModel, diags *diag.Diagno
 	// write-only value_wo and must not be persisted to state, so skip reading it
 	// back from the API. Otherwise refresh value from the API as before.
 	if m.ValueWOVersion.IsNull() {
-		m.Value = types.StringValue(variable.GetValue())
+		// Airflow's SecretsMasker returns the value of a secret-like variable (a
+		// key matching a sensitive pattern, e.g. *_PASSWORD) as a masked
+		// placeholder like "***". Keep the real state value in that case,
+		// otherwise Terraform reports an inconsistent result after apply / a
+		// perpetual diff. See #83.
+		if apiValue := variable.GetValue(); isMaskedValue(apiValue) && !m.Value.IsNull() {
+			// keep m.Value as-is
+		} else {
+			m.Value = types.StringValue(apiValue)
+		}
 	}
 	m.Description = types.StringValue(variable.GetDescription())
 	m.TeamName = types.StringValue(variable.GetTeamName())
 	return true
+}
+
+// isMaskedValue reports whether s is an Airflow SecretsMasker placeholder — a
+// non-empty string consisting solely of '*' (e.g. "***").
+func isMaskedValue(s string) bool {
+	return s != "" && strings.Trim(s, "*") == ""
 }
 
 // clientError builds a diagnostic detail for a failed Airflow API call. The
