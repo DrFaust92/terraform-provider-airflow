@@ -445,21 +445,25 @@ func (r *connectionResource) readInto(m *connectionResourceModel, diags *diag.Di
 		m.Port = types.Int64Value(0)
 	}
 
-	apiExtra := conn.GetExtra()
-	switch {
-	case !m.Extra.IsNull() && jsonSemanticEqual(m.Extra.ValueString(), apiExtra):
-		// Keep the configured/state value when it is semantically-equal JSON to
-		// what the API returns, so the post-apply value matches the plan
-		// (the API may reformat JSON).
-	case !m.Extra.IsNull() && jsonEqualIgnoringMasked(m.Extra.ValueString(), apiExtra):
-		// Airflow's SecretsMasker returns secret-like keys inside `extra` as
-		// masked placeholders (e.g. {"api_key":"***"}). When that masking is the
-		// only difference from state, keep the real state value so we neither
-		// persist "***" nor produce a perpetual diff. See GH issue #34.
-	case apiExtra != "":
-		m.Extra = types.StringValue(apiExtra)
-	case !m.Extra.IsNull():
-		m.Extra = types.StringValue("")
+	// In write-only mode (extra_wo_version set) `extra` came from the write-only
+	// extra_wo and must not be persisted to state, so skip reading it back.
+	if m.ExtraWOVersion.IsNull() {
+		apiExtra := conn.GetExtra()
+		switch {
+		case !m.Extra.IsNull() && jsonSemanticEqual(m.Extra.ValueString(), apiExtra):
+			// Keep the configured/state value when it is semantically-equal JSON to
+			// what the API returns, so the post-apply value matches the plan
+			// (the API may reformat JSON).
+		case !m.Extra.IsNull() && jsonEqualIgnoringMasked(m.Extra.ValueString(), apiExtra):
+			// Airflow's SecretsMasker returns secret-like keys inside `extra` as
+			// masked placeholders (e.g. {"api_key":"***"}). When that masking is the
+			// only difference from state, keep the real state value so we neither
+			// persist "***" nor produce a perpetual diff. See GH issue #34.
+		case apiExtra != "":
+			m.Extra = types.StringValue(apiExtra)
+		case !m.Extra.IsNull():
+			m.Extra = types.StringValue("")
+		}
 	}
 
 	// Preserve the configured password unless the API returns a real
