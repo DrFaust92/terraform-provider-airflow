@@ -312,14 +312,25 @@ func (r *variableResource) readInto(m *variableResourceModel, diags *diag.Diagno
 	// write-only value_wo and must not be persisted to state, so skip reading it
 	// back from the API. Otherwise refresh value from the API as before.
 	if m.ValueWOVersion.IsNull() {
-		// Airflow's SecretsMasker returns the value of a secret-like variable (a
-		// key matching a sensitive pattern, e.g. *_PASSWORD) as a masked
-		// placeholder like "***". Keep the real state value in that case,
-		// otherwise Terraform reports an inconsistent result after apply / a
-		// perpetual diff. See #83.
-		if apiValue := variable.GetValue(); isMaskedValue(apiValue) && !m.Value.IsNull() {
-			// keep m.Value as-is
-		} else {
+		// Airflow's SecretsMasker replaces secret-like values with a masked
+		// placeholder like "***" on read. Keep the real state value whenever
+		// masking is the only difference from what we sent, otherwise Terraform
+		// reports an inconsistent result after apply / a perpetual diff.
+		apiValue := variable.GetValue()
+		switch {
+		case m.Value.IsNull():
+			m.Value = types.StringValue(apiValue)
+		case isMaskedValue(apiValue):
+			// The whole value is masked (a scalar secret variable, e.g. a key
+			// matching *_PASSWORD). Keep m.Value as-is. See #83.
+		case jsonSemanticEqual(m.Value.ValueString(), apiValue):
+			// The API reformatted equivalent JSON; keep the state value so the
+			// post-apply value matches the plan.
+		case jsonEqualIgnoringMasked(m.Value.ValueString(), apiValue):
+			// The value is a JSON document and the masker redacted only some of
+			// its leaves (e.g. {"a":"***"}). Masking is the only difference, so
+			// keep the real state value. See #96.
+		default:
 			m.Value = types.StringValue(apiValue)
 		}
 	}
