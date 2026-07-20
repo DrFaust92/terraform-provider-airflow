@@ -121,6 +121,42 @@ func TestAccAirflowVariable_maskedSecret(t *testing.T) {
 	})
 }
 
+// TestAccAirflowVariable_maskedJSONSecret covers GH #96: when the value is a
+// JSON document, Airflow's SecretsMasker redacts only the secret-like leaves
+// (e.g. the "password" key) rather than the whole value. The provider must keep
+// the real state value in that case too, otherwise apply fails with
+// "inconsistent values for sensitive attribute" (the whole-string mask check
+// alone does not catch a partially-masked JSON value).
+func TestAccAirflowVariable_maskedJSONSecret(t *testing.T) {
+	rName := acctest.RandomWithPrefix("tf-acc-test")
+	resourceName := "airflow_variable.test"
+
+	// A JSON value with a sensitive sub-key ("password") that Airflow masks
+	// per-leaf, alongside a non-sensitive leaf that is returned verbatim.
+	value := `{"password":"supersecret","queue":"data_batch_job"}`
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckAirflowVariableCheckDestroy,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccAirflowVariableConfigBasic(rName, value),
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr(resourceName, "key", rName),
+					// The real value must be kept, not the partially-masked read-back.
+					resource.TestCheckResourceAttr(resourceName, "value", value),
+				),
+			},
+			{
+				// Re-apply must be a no-op: the partially-masked read-back must not diff.
+				Config:   testAccAirflowVariableConfigBasic(rName, value),
+				PlanOnly: true,
+			},
+		},
+	})
+}
+
 func testAccCheckAirflowVariableCheckDestroy(s *terraform.State) error {
 	cfg, err := testAccProviderConfig()
 	if err != nil {
@@ -284,4 +320,49 @@ func TestAccAirflowVariable_upgradeFromSDKv2(t *testing.T) {
 			},
 		},
 	})
+}
+
+// TestVariableValueMaskPreserved is a unit test for GH #96: a variable whose
+// value is a JSON document where Airflow's SecretsMasker redacts only some
+// leaves (not the whole value). The whole-string isMaskedValue check misses
+// this, so readInto relies on jsonEqualIgnoringMasked to detect that masking is
+// the only difference and keep the real state value, avoiding an "inconsistent
+// values for sensitive attribute" error after apply.
+func TestVariableValueMaskPreserved(t *testing.T) {
+	// The value from #96.
+	state := `{"root.data": {"batch":"data_batch_job", "stream":"data_stream_job"}}`
+
+	cases := map[string]struct {
+		api           string
+		wantWholeMask bool // isMaskedValue matches
+		wantJSONMask  bool // jsonEqualIgnoringMasked matches (masking-only diff)
+	}{
+		"partial leaf masked": {
+			api:          `{"root.data": {"batch":"data_batch_job", "stream":"***"}}`,
+			wantJSONMask: true,
+		},
+		"all leaves masked": {
+			api:          `{"root.data": {"batch":"***", "stream":"***"}}`,
+			wantJSONMask: true,
+		},
+		"whole value masked": {
+			api:           `***`,
+			wantWholeMask: true,
+		},
+		"genuinely changed value is not treated as masked": {
+			api:          `{"root.data": {"batch":"data_batch_job", "stream":"other_job"}}`,
+			wantJSONMask: false,
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			if got := isMaskedValue(tc.api); got != tc.wantWholeMask {
+				t.Errorf("isMaskedValue(%q) = %v, want %v", tc.api, got, tc.wantWholeMask)
+			}
+			if got := jsonEqualIgnoringMasked(state, tc.api); got != tc.wantJSONMask {
+				t.Errorf("jsonEqualIgnoringMasked(state, %q) = %v, want %v", tc.api, got, tc.wantJSONMask)
+			}
+		})
+	}
 }
