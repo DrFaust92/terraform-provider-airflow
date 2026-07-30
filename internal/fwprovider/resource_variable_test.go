@@ -124,8 +124,8 @@ func TestAccAirflowVariable_maskedSecret(t *testing.T) {
 // TestAccAirflowVariable_maskedJSONSecret covers GH #96: when the value is a
 // JSON document, Airflow's SecretsMasker redacts only the secret-like leaves
 // (e.g. the "password" key) rather than the whole value. The provider must keep
-// the real state value in that case too, otherwise apply fails with
-// "inconsistent values for sensitive attribute" (the whole-string mask check
+// the real state value in that case too, otherwise apply fails with an
+// inconsistent result after apply (the whole-string mask check
 // alone does not catch a partially-masked JSON value).
 func TestAccAirflowVariable_maskedJSONSecret(t *testing.T) {
 	rName := acctest.RandomWithPrefix("tf-acc-test")

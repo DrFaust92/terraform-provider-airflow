@@ -79,9 +79,8 @@ func (r *variableResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 				},
 			},
 			"value": schema.StringAttribute{
-				MarkdownDescription: "The variable value. Exactly one of `value` or `value_wo` must be set.",
+				MarkdownDescription: "The variable value. Shown in plan output and stored in plain text in state; use `value_wo` for secret values that must not appear in either. Exactly one of `value` or `value_wo` must be set.",
 				Optional:            true,
-				Sensitive:           true,
 				Validators: []validator.String{
 					stringvalidator.ConflictsWith(path.MatchRoot("value_wo")),
 				},
