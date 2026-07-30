@@ -372,6 +372,42 @@ func TestAccAirflowConnection_extraMaskedSecret(t *testing.T) {
 	})
 }
 
+// TestAccAirflowConnection_extraMaskedEmptySecret reproduces GH issue #98
+// (reopen of #83/#96): an `extra` JSON with a sensitive key whose value is the
+// empty string (e.g. "token_prefix":""). Airflow masks any sensitive key to
+// "***" on read regardless of its real value, so the empty value comes back
+// masked. The provider must restore it to "" rather than persist "***";
+// otherwise the create fails with "Provider produced inconsistent result after
+// apply: .extra: inconsistent values for sensitive attribute".
+func TestAccAirflowConnection_extraMaskedEmptySecret(t *testing.T) {
+	rName := acctest.RandomWithPrefix("tf-acc-test")
+	resourceName := "airflow_connection.test"
+
+	extra := `{"headers":{"x-libertify-api-key":"blablablabla"},"token_type":"x-test-api-key","token_prefix":""}`
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckAirflowConnectionCheckDestroy,
+		Steps: []resource.TestStep{
+			{
+				// Create must not error with an inconsistent-result-after-apply.
+				Config: testAccAirflowConnectionConfigExtra(rName, extra),
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr(resourceName, "connection_id", rName),
+					resource.TestCheckResourceAttr(resourceName, "extra", extra),
+				),
+			},
+			{
+				// Re-plan with the same config: the API returns masked values,
+				// but the provider must not surface a diff.
+				Config:   testAccAirflowConnectionConfigExtra(rName, extra),
+				PlanOnly: true,
+			},
+		},
+	})
+}
+
 // TestAccAirflowConnection_validation covers the framework validators on the
 // connection resource (config-time, no API calls): password/password_wo
 // conflict, the password_wo/password_wo_version co-requirement, and the port
