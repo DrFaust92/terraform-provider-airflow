@@ -541,8 +541,9 @@ func jsonEqualIgnoringMasked(state, api string) bool {
 }
 
 // unmaskAgainst returns a copy of api with every masked string leaf (non-empty
-// and consisting solely of '*') replaced by the corresponding value from state
-// when one is available, leaving all other values untouched.
+// and consisting solely of '*') replaced by the corresponding string value from
+// state when state has one (including the empty string), leaving all other
+// values untouched.
 func unmaskAgainst(api, state interface{}) interface{} {
 	switch a := api.(type) {
 	case map[string]interface{}:
@@ -569,7 +570,13 @@ func unmaskAgainst(api, state interface{}) interface{} {
 		return out
 	case string:
 		if a != "" && strings.Trim(a, "*") == "" {
-			if s, ok := state.(string); ok && s != "" {
+			// Restore the state value whenever state carries a string for this
+			// leaf, including the empty string: Airflow masks sensitive keys to
+			// "***" regardless of their real value, so an empty-valued sensitive
+			// key (e.g. {"token_prefix":""}) comes back as "***" and must map
+			// back to "". The `ok` check already distinguishes a state string
+			// from an absent/typed-differently leaf.
+			if s, ok := state.(string); ok {
 				return s
 			}
 		}
