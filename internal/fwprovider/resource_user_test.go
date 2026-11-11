@@ -76,7 +76,7 @@ func testAccCheckAirflowUserCheckDestroy(s *terraform.State) error {
 			continue
 		}
 
-		user, res, err := cfg.ApiClient.UserApi.GetUser(cfg.AuthContext, rs.Primary.ID).Execute()
+		user, res, err := cfg.AuthManagerApiClient.UserApi.GetUser(cfg.AuthContext, rs.Primary.ID).Execute()
 		if err == nil {
 			if user.GetUsername() == rs.Primary.ID {
 				return fmt.Errorf("Airflow User (%s) still exists.", rs.Primary.ID)

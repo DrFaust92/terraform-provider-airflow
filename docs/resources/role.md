@@ -3,12 +3,12 @@
 page_title: "airflow_role Resource - airflow"
 subcategory: ""
 description: |-
-  Provides an Airflow role. Note this resource is not supported on Airflow v3 (API v2): the Roles API is not available in Airflow v3.
+  Provides an Airflow role. On Airflow 3, set the provider auth_manager_base_path (e.g. /auth/fab/v1).
 ---
 
 # airflow_role (Resource)
 
-Provides an Airflow role. Note this resource is not supported on Airflow v3 (API v2): the Roles API is not available in Airflow v3.
+Provides an Airflow role. On Airflow 3, set the provider `auth_manager_base_path` (e.g. `/auth/fab/v1`).
 
 ## Example Usage
 

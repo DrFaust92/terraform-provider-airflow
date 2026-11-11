@@ -93,7 +93,7 @@ func TestAccAirflowUser_disappears(t *testing.T) {
 		Steps: []resource.TestStep{{
 			Config: testAccAirflowUserConfigBasic(rName, rName),
 			Check: testAccCheckDisappears("airflow_user.test", func(cfg client.ProviderConfig, id string) (*http.Response, error) {
-				return cfg.ApiClient.UserApi.DeleteUser(cfg.AuthContext, id).Execute()
+				return cfg.AuthManagerApiClient.UserApi.DeleteUser(cfg.AuthContext, id).Execute()
 			}),
 			ExpectNonEmptyPlan: true,
 		}},
@@ -111,7 +111,7 @@ func TestAccAirflowRole_disappears(t *testing.T) {
 		Steps: []resource.TestStep{{
 			Config: testAccAirflowRoleConfigBasic(rName, "can_read", "Audit Logs"),
 			Check: testAccCheckDisappears("airflow_role.test", func(cfg client.ProviderConfig, id string) (*http.Response, error) {
-				return cfg.ApiClient.RoleApi.DeleteRole(cfg.AuthContext, id).Execute()
+				return cfg.AuthManagerApiClient.RoleApi.DeleteRole(cfg.AuthContext, id).Execute()
 			}),
 			ExpectNonEmptyPlan: true,
 		}},

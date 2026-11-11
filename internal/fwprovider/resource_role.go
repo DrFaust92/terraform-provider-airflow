@@ -49,7 +49,7 @@ func (r *roleResource) Metadata(_ context.Context, req resource.MetadataRequest,
 
 func (r *roleResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "Provides an Airflow role. Note this resource is not supported on Airflow v3 (API v2): the Roles API is not available in Airflow v3.",
+		MarkdownDescription: "Provides an Airflow role. On Airflow 3, set the provider `auth_manager_base_path` (e.g. `/auth/fab/v1`).",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				MarkdownDescription: "The role name.",
@@ -119,20 +119,15 @@ func (r *roleResource) Create(ctx context.Context, req resource.CreateRequest, r
 		Actions: expandRoleActions(plan.Actions),
 	}
 
-	_, httpResp, err := r.config.ApiClient.RoleApi.PostRole(r.config.AuthContext).Role(role).Execute()
+	_, httpResp, err := r.config.AuthManagerApiClient.RoleApi.PostRole(r.config.AuthContext).Role(role).Execute()
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create Airflow role", clientError("create", name, httpResp, err))
 		return
 	}
 
+	// Save the plan rather than reading back: actions the server adds itself
+	// would fail the post-apply consistency check. They show as drift instead.
 	plan.ID = types.StringValue(name)
-	if found := r.readInto(&plan, &resp.Diagnostics); resp.Diagnostics.HasError() {
-		return
-	} else if !found {
-		resp.Diagnostics.AddError("Failed to read Airflow role after create", fmt.Sprintf("role %q not found immediately after creation", name))
-		return
-	}
-
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
@@ -168,16 +163,9 @@ func (r *roleResource) Update(ctx context.Context, req resource.UpdateRequest, r
 		Actions: expandRoleActions(plan.Actions),
 	}
 
-	_, httpResp, err := r.config.ApiClient.RoleApi.PatchRole(r.config.AuthContext, name).Role(role).Execute()
+	_, httpResp, err := r.config.AuthManagerApiClient.RoleApi.PatchRole(r.config.AuthContext, name).Role(role).Execute()
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to update Airflow role", clientError("update", name, httpResp, err))
-		return
-	}
-
-	if found := r.readInto(&plan, &resp.Diagnostics); resp.Diagnostics.HasError() {
-		return
-	} else if !found {
-		resp.State.RemoveResource(ctx)
 		return
 	}
 
@@ -192,7 +180,7 @@ func (r *roleResource) Delete(ctx context.Context, req resource.DeleteRequest, r
 	}
 
 	name := state.ID.ValueString()
-	httpResp, err := r.config.ApiClient.RoleApi.DeleteRole(r.config.AuthContext, name).Execute()
+	httpResp, err := r.config.AuthManagerApiClient.RoleApi.DeleteRole(r.config.AuthContext, name).Execute()
 	if err != nil {
 		if httpResp != nil && httpResp.StatusCode == http.StatusNotFound {
 			return
@@ -210,7 +198,7 @@ func (r *roleResource) ImportState(ctx context.Context, req resource.ImportState
 func (r *roleResource) readInto(m *roleResourceModel, diags *diag.Diagnostics) (found bool) {
 	id := m.ID.ValueString()
 
-	role, httpResp, err := r.config.ApiClient.RoleApi.GetRole(r.config.AuthContext, id).Execute()
+	role, httpResp, err := r.config.AuthManagerApiClient.RoleApi.GetRole(r.config.AuthContext, id).Execute()
 	if httpResp != nil && httpResp.StatusCode == http.StatusNotFound {
 		return false
 	}

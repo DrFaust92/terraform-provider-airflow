@@ -57,7 +57,7 @@ func (r *userResource) Metadata(_ context.Context, req resource.MetadataRequest,
 
 func (r *userResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "Provides an Airflow user. Note this resource is not supported on Airflow v3 (API v2): the Users API is not available in Airflow v3.",
+		MarkdownDescription: "Provides an Airflow user. On Airflow 3, set the provider `auth_manager_base_path` (e.g. `/auth/fab/v1`).",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				MarkdownDescription: "The username.",
@@ -192,7 +192,7 @@ func (r *userResource) Create(ctx context.Context, req resource.CreateRequest, r
 		return
 	}
 
-	_, httpResp, err := r.config.ApiClient.UserApi.PostUser(r.config.AuthContext).User(airflow.User{
+	_, httpResp, err := r.config.AuthManagerApiClient.UserApi.PostUser(r.config.AuthContext).User(airflow.User{
 		Email:     &email,
 		FirstName: &firstName,
 		LastName:  &lastName,
@@ -206,7 +206,7 @@ func (r *userResource) Create(ctx context.Context, req resource.CreateRequest, r
 	}
 
 	plan.ID = types.StringValue(username)
-	if found := r.readInto(&plan, &resp.Diagnostics); resp.Diagnostics.HasError() {
+	if found := r.readComputedInto(&plan, &resp.Diagnostics); resp.Diagnostics.HasError() {
 		return
 	} else if !found {
 		resp.Diagnostics.AddError("Failed to read Airflow user after create", fmt.Sprintf("user %q not found immediately after creation", username))
@@ -264,7 +264,7 @@ func (r *userResource) Update(ctx context.Context, req resource.UpdateRequest, r
 		return
 	}
 
-	_, httpResp, err := r.config.ApiClient.UserApi.PatchUser(r.config.AuthContext, username).User(airflow.User{
+	_, httpResp, err := r.config.AuthManagerApiClient.UserApi.PatchUser(r.config.AuthContext, username).User(airflow.User{
 		Email:     &email,
 		FirstName: &firstName,
 		LastName:  &lastName,
@@ -277,7 +277,7 @@ func (r *userResource) Update(ctx context.Context, req resource.UpdateRequest, r
 		return
 	}
 
-	if found := r.readInto(&plan, &resp.Diagnostics); resp.Diagnostics.HasError() {
+	if found := r.readComputedInto(&plan, &resp.Diagnostics); resp.Diagnostics.HasError() {
 		return
 	} else if !found {
 		resp.State.RemoveResource(ctx)
@@ -295,7 +295,7 @@ func (r *userResource) Delete(ctx context.Context, req resource.DeleteRequest, r
 	}
 
 	username := state.ID.ValueString()
-	httpResp, err := r.config.ApiClient.UserApi.DeleteUser(r.config.AuthContext, username).Execute()
+	httpResp, err := r.config.AuthManagerApiClient.UserApi.DeleteUser(r.config.AuthContext, username).Execute()
 	if err != nil {
 		if httpResp != nil && httpResp.StatusCode == http.StatusNotFound {
 			return
@@ -308,13 +308,27 @@ func (r *userResource) ImportState(ctx context.Context, req resource.ImportState
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
 }
 
+// readComputedInto refreshes only the computed attributes of m and keeps the
+// planned values; see roleResource.Create.
+func (r *userResource) readComputedInto(m *userResourceModel, diags *diag.Diagnostics) (found bool) {
+	remote := *m
+	if found = r.readInto(&remote, diags); !found {
+		return false
+	}
+
+	m.Active = remote.Active
+	m.FailedLoginCount = remote.FailedLoginCount
+	m.LoginCount = remote.LoginCount
+	return true
+}
+
 // readInto fetches the user identified by m.ID and populates m. The password is
 // never returned by the API, so the existing model value is preserved. Returns
 // false (without adding diagnostics) when the user no longer exists.
 func (r *userResource) readInto(m *userResourceModel, diags *diag.Diagnostics) (found bool) {
 	id := m.ID.ValueString()
 
-	user, httpResp, err := r.config.ApiClient.UserApi.GetUser(r.config.AuthContext, id).Execute()
+	user, httpResp, err := r.config.AuthManagerApiClient.UserApi.GetUser(r.config.AuthContext, id).Execute()
 	if httpResp != nil && httpResp.StatusCode == http.StatusNotFound {
 		return false
 	}

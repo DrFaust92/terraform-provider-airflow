@@ -194,6 +194,7 @@ func testAccProviderConfig() (client.ProviderConfig, error) {
 		false,
 		cmp.Or(os.Getenv("AIRFLOW_API_BASE_PATH"), defaultBasePath),
 		os.Getenv("AIRFLOW_SESSION_COOKIE"),
+		os.Getenv("AIRFLOW_AUTH_MANAGER_BASE_PATH"),
 	)
 }
 

@@ -44,7 +44,7 @@ func (r *userRolesResource) Metadata(_ context.Context, req resource.MetadataReq
 
 func (r *userRolesResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "Provides an Airflow user roles management. Note this resource is not supported on Airflow v3 (API v2): the User Roles API is not available in Airflow v3.",
+		MarkdownDescription: "Provides an Airflow user roles management. On Airflow 3, set the provider `auth_manager_base_path` (e.g. `/auth/fab/v1`).",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				MarkdownDescription: "The username.",
@@ -102,14 +102,8 @@ func (r *userRolesResource) Create(ctx context.Context, req resource.CreateReque
 		return
 	}
 
+	// Save the plan rather than reading back; see roleResource.Create.
 	plan.ID = types.StringValue(username)
-	if found := r.readInto(&plan, &resp.Diagnostics); resp.Diagnostics.HasError() {
-		return
-	} else if !found {
-		resp.Diagnostics.AddError("Failed to read Airflow user after assigning roles", fmt.Sprintf("user %q not found immediately after creation", username))
-		return
-	}
-
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
@@ -145,13 +139,6 @@ func (r *userRolesResource) Update(ctx context.Context, req resource.UpdateReque
 		return
 	}
 
-	if found := r.readInto(&plan, &resp.Diagnostics); resp.Diagnostics.HasError() {
-		return
-	} else if !found {
-		resp.State.RemoveResource(ctx)
-		return
-	}
-
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
@@ -166,7 +153,7 @@ func (r *userRolesResource) Delete(ctx context.Context, req resource.DeleteReque
 	// Mirror the SDKv2 resource: clear the user's roles, then delete the user.
 	_ = r.patchRoles(username, []airflow.UserCollectionItemRoles{})
 
-	httpResp, err := r.config.ApiClient.UserApi.DeleteUser(r.config.AuthContext, username).Execute()
+	httpResp, err := r.config.AuthManagerApiClient.UserApi.DeleteUser(r.config.AuthContext, username).Execute()
 	if err != nil {
 		if httpResp != nil && httpResp.StatusCode == http.StatusNotFound {
 			return
@@ -182,7 +169,7 @@ func (r *userRolesResource) ImportState(ctx context.Context, req resource.Import
 // patchRoles sets the user's roles via a roles-only update mask, matching the
 // SDKv2 resource which fills the required name fields with the username.
 func (r *userRolesResource) patchRoles(username string, roles []airflow.UserCollectionItemRoles) error {
-	_, httpResp, err := r.config.ApiClient.UserApi.PatchUser(r.config.AuthContext, username).
+	_, httpResp, err := r.config.AuthManagerApiClient.UserApi.PatchUser(r.config.AuthContext, username).
 		UpdateMask([]string{"roles"}).
 		User(airflow.User{
 			Roles:     roles,
@@ -202,7 +189,7 @@ func (r *userRolesResource) patchRoles(username string, roles []airflow.UserColl
 func (r *userRolesResource) readInto(m *userRolesResourceModel, diags *diag.Diagnostics) (found bool) {
 	id := m.ID.ValueString()
 
-	user, httpResp, err := r.config.ApiClient.UserApi.GetUser(r.config.AuthContext, id).Execute()
+	user, httpResp, err := r.config.AuthManagerApiClient.UserApi.GetUser(r.config.AuthContext, id).Execute()
 	if httpResp != nil && httpResp.StatusCode == http.StatusNotFound {
 		return false
 	}
