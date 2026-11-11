@@ -17,13 +17,16 @@ import (
 
 // ProviderConfig is the configured Airflow client handed to each resource.
 type ProviderConfig struct {
-	ApiClient   *airflow.APIClient
-	AuthContext context.Context
+	ApiClient *airflow.APIClient
+	// AuthManagerApiClient serves roles and users; it is ApiClient unless an
+	// auth manager base path is set.
+	AuthManagerApiClient *airflow.APIClient
+	AuthContext          context.Context
 }
 
 // NewProviderConfig builds the Airflow API client and auth context from the
 // already-resolved provider configuration values.
-func NewProviderConfig(endpoint, oauth2Token, username, password string, disableSSL bool, basePath, sessionCookie string) (ProviderConfig, error) {
+func NewProviderConfig(endpoint, oauth2Token, username, password string, disableSSL bool, basePath, sessionCookie, authManagerBasePath string) (ProviderConfig, error) {
 	transport := http.DefaultTransport
 	if disableSSL {
 		transport = &http.Transport{
@@ -64,22 +67,31 @@ func NewProviderConfig(endpoint, oauth2Token, username, password string, disable
 		log.Printf("[DEBUG] Using session cookie authentication")
 	}
 
-	clientConf := &airflow.Configuration{
-		Scheme:        u.Scheme,
-		Host:          u.Host,
-		DefaultHeader: defaultHeaders,
-		Debug:         true,
-		HTTPClient:    httpClient,
-		Servers: airflow.ServerConfigurations{
-			{
-				URL:         fmt.Sprint(path, basePath),
-				Description: "Apache Airflow Stable API.",
+	newClient := func(apiPath, description string) *airflow.APIClient {
+		return airflow.NewAPIClient(&airflow.Configuration{
+			Scheme:        u.Scheme,
+			Host:          u.Host,
+			DefaultHeader: defaultHeaders,
+			Debug:         true,
+			HTTPClient:    httpClient,
+			Servers: airflow.ServerConfigurations{
+				{
+					URL:         fmt.Sprint(path, apiPath),
+					Description: description,
+				},
 			},
-		},
+		})
+	}
+
+	apiClient := newClient(basePath, "Apache Airflow Stable API.")
+	authManagerClient := apiClient
+	if authManagerBasePath != "" {
+		authManagerClient = newClient(authManagerBasePath, "Apache Airflow auth manager API.")
 	}
 
 	return ProviderConfig{
-		ApiClient:   airflow.NewAPIClient(clientConf),
-		AuthContext: ctx,
+		ApiClient:            apiClient,
+		AuthManagerApiClient: authManagerClient,
+		AuthContext:          ctx,
 	}, nil
 }

@@ -74,7 +74,7 @@ func testAccCheckAirflowUserRolesCheckDestroy(s *terraform.State) error {
 			continue
 		}
 
-		user, res, err := cfg.ApiClient.UserApi.GetUser(cfg.AuthContext, rs.Primary.ID).Execute()
+		user, res, err := cfg.AuthManagerApiClient.UserApi.GetUser(cfg.AuthContext, rs.Primary.ID).Execute()
 		if err == nil {
 			if len(user.Roles) != 0 {
 				return fmt.Errorf("Airflow User (%s) still have some roles.", rs.Primary.ID)
@@ -85,7 +85,7 @@ func testAccCheckAirflowUserRolesCheckDestroy(s *terraform.State) error {
 			continue
 		}
 	}
-	_, _ = cfg.ApiClient.UserApi.DeleteUser(cfg.AuthContext, accName).Execute()
+	_, _ = cfg.AuthManagerApiClient.UserApi.DeleteUser(cfg.AuthContext, accName).Execute()
 
 	return nil
 }

@@ -126,6 +126,19 @@ curl -X POST https://airflow-server.net/auth/token \
   }'
 ```
 
+#### Roles and users on Airflow V3
+
+Airflow v3 serves roles and users from the auth manager (`/auth/fab/v1` for FAB), not the core API. Set `auth_manager_base_path` to point `airflow_role`, `airflow_user` and `airflow_user_roles` there.
+
+```terraform
+provider "airflow" {
+  base_endpoint          = "https://airflow-server.net"
+  oauth2_token           = "token"
+  base_path              = "/api/v2"
+  auth_manager_base_path = "/auth/fab/v1"
+}
+```
+
 {{ .SchemaMarkdown | trimspace }}
 
 ## Running Acceptence Tests

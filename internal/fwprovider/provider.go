@@ -70,6 +70,10 @@ func (p *airflowProvider) Schema(_ context.Context, _ fwprovider.SchemaRequest, 
 				Optional:    true,
 				Description: "Base path for Airflow API endpoints",
 			},
+			"auth_manager_base_path": schema.StringAttribute{
+				Optional:    true,
+				Description: "Base path for the auth manager API used by `airflow_role`, `airflow_user` and `airflow_user_roles`, e.g. `/auth/fab/v1` on Airflow 3. Defaults to `base_path`.",
+			},
 			"session_cookie": schema.StringAttribute{
 				Optional:    true,
 				Sensitive:   true,
@@ -87,6 +91,7 @@ type airflowProviderModel struct {
 	DisableSSLVerification types.Bool   `tfsdk:"disable_ssl_verification"`
 	BasePath               types.String `tfsdk:"base_path"`
 	SessionCookie          types.String `tfsdk:"session_cookie"`
+	AuthManagerBasePath    types.String `tfsdk:"auth_manager_base_path"`
 }
 
 func (p *airflowProvider) Configure(_ context.Context, req fwprovider.ConfigureRequest, resp *fwprovider.ConfigureResponse) {
@@ -104,6 +109,7 @@ func (p *airflowProvider) Configure(_ context.Context, req fwprovider.ConfigureR
 	password := stringOrEnv(config.Password, "AIRFLOW_API_PASSWORD", "")
 	basePath := stringOrEnv(config.BasePath, "AIRFLOW_API_BASE_PATH", defaultBasePath)
 	sessionCookie := stringOrEnv(config.SessionCookie, "AIRFLOW_SESSION_COOKIE", "")
+	authManagerBasePath := stringOrEnv(config.AuthManagerBasePath, "AIRFLOW_AUTH_MANAGER_BASE_PATH", "")
 	disableSSL := config.DisableSSLVerification.ValueBool()
 
 	if endpoint == "" {
@@ -115,7 +121,7 @@ func (p *airflowProvider) Configure(_ context.Context, req fwprovider.ConfigureR
 		return
 	}
 
-	cfg, err := client.NewProviderConfig(endpoint, oauth2Token, username, password, disableSSL, basePath, sessionCookie)
+	cfg, err := client.NewProviderConfig(endpoint, oauth2Token, username, password, disableSSL, basePath, sessionCookie, authManagerBasePath)
 	if err != nil {
 		resp.Diagnostics.AddError("Unable to configure Airflow API client", err.Error())
 		return
