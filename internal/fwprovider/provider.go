@@ -72,7 +72,7 @@ func (p *airflowProvider) Schema(_ context.Context, _ fwprovider.SchemaRequest, 
 			},
 			"auth_manager_base_path": schema.StringAttribute{
 				Optional:    true,
-				Description: "Base path for the auth manager API used by `airflow_role`, `airflow_user` and `airflow_user_roles`, e.g. `/auth/fab/v1` on Airflow 3. Defaults to `base_path`.",
+				Description: "Base path for the auth manager API used by `airflow_role`, `airflow_user` and `airflow_user_roles`, Defaults to `/auth/fab/v1` when `base_path` is `/api/v2` (Airflow 3), otherwise to `base_path`.",
 			},
 			"session_cookie": schema.StringAttribute{
 				Optional:    true,

@@ -15,6 +15,10 @@ import (
 	"github.com/apache/airflow-client-go/airflow"
 )
 
+// DefaultAuthManagerBasePathV3 is the FAB auth manager API path used for users
+// and roles on Airflow 3 when no auth manager base path is configured.
+const DefaultAuthManagerBasePathV3 = "/auth/fab/v1"
+
 // ProviderConfig is the configured Airflow client handed to each resource.
 type ProviderConfig struct {
 	ApiClient *airflow.APIClient
@@ -81,6 +85,12 @@ func NewProviderConfig(endpoint, oauth2Token, username, password string, disable
 				},
 			},
 		})
+	}
+
+	// Airflow 3 serves users and roles from the FAB auth manager rather than
+	// the core API, so default to it when the core API is v2.
+	if authManagerBasePath == "" && strings.TrimSuffix(basePath, "/") == "/api/v2" {
+		authManagerBasePath = DefaultAuthManagerBasePathV3
 	}
 
 	apiClient := newClient(basePath, "Apache Airflow Stable API.")

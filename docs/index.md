@@ -128,14 +128,14 @@ curl -X POST https://airflow-server.net/auth/token \
 
 #### Roles and users on Airflow V3
 
-Airflow v3 serves roles and users from the auth manager (`/auth/fab/v1` for FAB), not the core API. Set `auth_manager_base_path` to point `airflow_role`, `airflow_user` and `airflow_user_roles` there.
+Airflow v3 serves roles and users from the auth manager (`/auth/fab/v1` for FAB), not the core API. When `base_path` is `/api/v2`, `airflow_role`, `airflow_user` and `airflow_user_roles` use `/auth/fab/v1` by default. Set `auth_manager_base_path` to override it.
 
 ```terraform
 provider "airflow" {
   base_endpoint          = "https://airflow-server.net"
   oauth2_token           = "token"
   base_path              = "/api/v2"
-  auth_manager_base_path = "/auth/fab/v1"
+  auth_manager_base_path = "/auth/fab/v1" # optional, this is the default for /api/v2
 }
 ```
 
@@ -144,7 +144,7 @@ provider "airflow" {
 
 ### Optional
 
-- `auth_manager_base_path` (String) Base path for the auth manager API used by `airflow_role`, `airflow_user` and `airflow_user_roles`, e.g. `/auth/fab/v1` on Airflow 3. Defaults to `base_path`.
+- `auth_manager_base_path` (String) Base path for the auth manager API used by `airflow_role`, `airflow_user` and `airflow_user_roles`, Defaults to `/auth/fab/v1` when `base_path` is `/api/v2` (Airflow 3), otherwise to `base_path`.
 - `base_endpoint` (String)
 - `base_path` (String) Base path for Airflow API endpoints
 - `disable_ssl_verification` (Boolean) Disable SSL verification
