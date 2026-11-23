@@ -251,7 +251,7 @@ func (r *poolResource) Delete(ctx context.Context, req resource.DeleteRequest, r
 }
 
 func (r *poolResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
+	resource.ImportStatePassthroughWithIdentity(ctx, path.Root("id"), path.Root("id"), req, resp)
 }
 
 // readInto fetches the pool identified by m.ID and populates m. It returns

@@ -11,6 +11,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
+	"github.com/hashicorp/terraform-plugin-framework/resource/identityschema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
@@ -22,6 +23,7 @@ var (
 	_ resource.Resource                = &userRolesResource{}
 	_ resource.ResourceWithConfigure   = &userRolesResource{}
 	_ resource.ResourceWithImportState = &userRolesResource{}
+	_ resource.ResourceWithIdentity    = &userRolesResource{}
 )
 
 func newUserRolesResource() resource.Resource {
@@ -105,6 +107,7 @@ func (r *userRolesResource) Create(ctx context.Context, req resource.CreateReque
 	// Save the plan rather than reading back; see roleResource.Create.
 	plan.ID = types.StringValue(username)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
+	resp.Diagnostics.Append(resp.Identity.Set(ctx, userRolesIdentity(plan.ID))...)
 }
 
 func (r *userRolesResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
@@ -124,6 +127,7 @@ func (r *userRolesResource) Read(ctx context.Context, req resource.ReadRequest, 
 	}
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
+	resp.Diagnostics.Append(resp.Identity.Set(ctx, userRolesIdentity(state.ID))...)
 }
 
 func (r *userRolesResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
@@ -140,6 +144,7 @@ func (r *userRolesResource) Update(ctx context.Context, req resource.UpdateReque
 	}
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
+	resp.Diagnostics.Append(resp.Identity.Set(ctx, userRolesIdentity(plan.ID))...)
 }
 
 func (r *userRolesResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
@@ -162,8 +167,29 @@ func (r *userRolesResource) Delete(ctx context.Context, req resource.DeleteReque
 	}
 }
 
+// userRolesIdentityModel is the resource identity for airflow_user_roles.
+type userRolesIdentityModel struct {
+	Username types.String `tfsdk:"username"`
+}
+
+func (r *userRolesResource) IdentitySchema(_ context.Context, _ resource.IdentitySchemaRequest, resp *resource.IdentitySchemaResponse) {
+	resp.IdentitySchema = identityschema.Schema{
+		Attributes: map[string]identityschema.Attribute{
+			"username": identityschema.StringAttribute{
+				RequiredForImport: true,
+				Description:       "The username whose roles are managed.",
+			},
+		},
+	}
+}
+
+// userRolesIdentity builds the resource identity from the resource ID.
+func userRolesIdentity(id types.String) userRolesIdentityModel {
+	return userRolesIdentityModel{Username: id}
+}
+
 func (r *userRolesResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
+	resource.ImportStatePassthroughWithIdentity(ctx, path.Root("id"), path.Root("username"), req, resp)
 }
 
 // patchRoles sets the user's roles via a roles-only update mask, matching the

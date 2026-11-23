@@ -374,7 +374,7 @@ func (r *connectionResource) Delete(ctx context.Context, req resource.DeleteRequ
 }
 
 func (r *connectionResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
+	resource.ImportStatePassthroughWithIdentity(ctx, path.Root("id"), path.Root("id"), req, resp)
 }
 
 // resolvePassword returns the password to send on create: the configured

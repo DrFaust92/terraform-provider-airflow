@@ -8,7 +8,10 @@ import (
 	"github.com/apache/airflow-client-go/airflow"
 	"github.com/hashicorp/terraform-plugin-testing/helper/acctest"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/hashicorp/terraform-plugin-testing/statecheck"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
+	"github.com/hashicorp/terraform-plugin-testing/tfjsonpath"
+	"github.com/hashicorp/terraform-plugin-testing/tfversion"
 )
 
 // NOTE: airflow_user_roles is still served by the SDKv2 provider, but its
@@ -187,6 +190,37 @@ func TestAccAirflowUserRoles_upgradeFromSDKv2(t *testing.T) {
 					resource.TestCheckResourceAttr(resourceName, "username", accName),
 					resource.TestCheckResourceAttr(resourceName, "roles.#", "1"),
 				),
+			},
+		},
+	})
+}
+
+// TestAccAirflowUserRoles_identity checks the resource identity and import by identity (Terraform 1.12+).
+func TestAccAirflowUserRoles_identity(t *testing.T) {
+	if os.Getenv("SKIP_AIRFLOW_USER_ROLES_TESTS") == "true" {
+		t.Skip("Skipping tests (SKIP_AIRFLOW_USER_ROLES_TESTS)")
+	}
+	rName := acctest.RandomWithPrefix("tf-role-test")
+	resourceName := "airflow_user_roles.test"
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheckCreateUser(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckAirflowUserRolesCheckDestroy,
+		TerraformVersionChecks: []tfversion.TerraformVersionCheck{
+			tfversion.SkipBelow(tfversion.Version1_12_0),
+		},
+		Steps: []resource.TestStep{
+			{
+				Config: testAccAirflowUserRolesConfigBasic(accName, rName),
+				ConfigStateChecks: []statecheck.StateCheck{
+					statecheck.ExpectIdentityValueMatchesState(resourceName, tfjsonpath.New("username")),
+				},
+			},
+			{
+				ResourceName:    resourceName,
+				ImportState:     true,
+				ImportStateKind: resource.ImportBlockWithResourceIdentity,
 			},
 		},
 	})

@@ -10,6 +10,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
+	"github.com/hashicorp/terraform-plugin-framework/resource/identityschema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
@@ -21,6 +22,7 @@ var (
 	_ resource.Resource                = &dagResource{}
 	_ resource.ResourceWithConfigure   = &dagResource{}
 	_ resource.ResourceWithImportState = &dagResource{}
+	_ resource.ResourceWithIdentity    = &dagResource{}
 )
 
 func newDagResource() resource.Resource {
@@ -136,6 +138,7 @@ func (r *dagResource) Create(ctx context.Context, req resource.CreateRequest, re
 	}
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
+	resp.Diagnostics.Append(resp.Identity.Set(ctx, dagIdentity(plan.ID))...)
 }
 
 func (r *dagResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
@@ -155,6 +158,7 @@ func (r *dagResource) Read(ctx context.Context, req resource.ReadRequest, resp *
 	}
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
+	resp.Diagnostics.Append(resp.Identity.Set(ctx, dagIdentity(state.ID))...)
 }
 
 func (r *dagResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
@@ -170,6 +174,7 @@ func (r *dagResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	}
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
+	resp.Diagnostics.Append(resp.Identity.Set(ctx, dagIdentity(plan.ID))...)
 }
 
 func (r *dagResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
@@ -195,8 +200,29 @@ func (r *dagResource) Delete(ctx context.Context, req resource.DeleteRequest, re
 	}
 }
 
+// dagIdentityModel is the resource identity for airflow_dag.
+type dagIdentityModel struct {
+	DagID types.String `tfsdk:"dag_id"`
+}
+
+func (r *dagResource) IdentitySchema(_ context.Context, _ resource.IdentitySchemaRequest, resp *resource.IdentitySchemaResponse) {
+	resp.IdentitySchema = identityschema.Schema{
+		Attributes: map[string]identityschema.Attribute{
+			"dag_id": identityschema.StringAttribute{
+				RequiredForImport: true,
+				Description:       "The DAG ID.",
+			},
+		},
+	}
+}
+
+// dagIdentity builds the resource identity from the resource ID.
+func dagIdentity(id types.String) dagIdentityModel {
+	return dagIdentityModel{DagID: id}
+}
+
 func (r *dagResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
+	resource.ImportStatePassthroughWithIdentity(ctx, path.Root("id"), path.Root("dag_id"), req, resp)
 }
 
 // apply patches the DAG's is_paused flag and refreshes the model.

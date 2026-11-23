@@ -289,7 +289,7 @@ func (r *variableResource) Delete(ctx context.Context, req resource.DeleteReques
 }
 
 func (r *variableResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
+	resource.ImportStatePassthroughWithIdentity(ctx, path.Root("id"), path.Root("id"), req, resp)
 }
 
 // readInto fetches the variable identified by m.ID and populates m. It returns
