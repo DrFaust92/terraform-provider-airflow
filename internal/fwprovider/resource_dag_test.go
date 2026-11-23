@@ -7,7 +7,10 @@ import (
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/hashicorp/terraform-plugin-testing/statecheck"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
+	"github.com/hashicorp/terraform-plugin-testing/tfjsonpath"
+	"github.com/hashicorp/terraform-plugin-testing/tfversion"
 )
 
 func TestAccAirflowDag_basic(t *testing.T) {
@@ -95,4 +98,36 @@ resource "airflow_dag" "test" {
   is_paused = %[1]t
 }
 `, paused)
+}
+
+// TestAccAirflowDag_identity checks the resource identity and import by identity (Terraform 1.12+).
+func TestAccAirflowDag_identity(t *testing.T) {
+	if os.Getenv("SKIP_AIRFLOW_DAG_TESTS") == "true" {
+		t.Skip("Skipping tests (SKIP_AIRFLOW_DAG_TESTS)")
+	}
+	resourceName := "airflow_dag.test"
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckAirflowDagCheckDestroy,
+		TerraformVersionChecks: []tfversion.TerraformVersionCheck{
+			tfversion.SkipBelow(tfversion.Version1_12_0),
+		},
+		Steps: []resource.TestStep{
+			{
+				Config: testAccAirflowDagConfigBasic(true),
+				ConfigStateChecks: []statecheck.StateCheck{
+					statecheck.ExpectIdentityValueMatchesState(resourceName, tfjsonpath.New("dag_id")),
+				},
+			},
+			{
+				ResourceName:    resourceName,
+				ImportState:     true,
+				ImportStateKind: resource.ImportBlockWithResourceIdentity,
+				// Config-only attributes are not recoverable on import.
+				ExpectNonEmptyPlan: true,
+			},
+		},
+	})
 }

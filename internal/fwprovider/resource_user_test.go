@@ -8,7 +8,10 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/acctest"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/hashicorp/terraform-plugin-testing/statecheck"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
+	"github.com/hashicorp/terraform-plugin-testing/tfjsonpath"
+	"github.com/hashicorp/terraform-plugin-testing/tfversion"
 )
 
 // NOTE: airflow_user is still served by the SDKv2 provider, but its acceptance
@@ -239,6 +242,39 @@ func TestAccAirflowUser_upgradeFromSDKv2(t *testing.T) {
 					resource.TestCheckResourceAttr(resourceName, "username", rName),
 					resource.TestCheckResourceAttr(resourceName, "roles.#", "1"),
 				),
+			},
+		},
+	})
+}
+
+// TestAccAirflowUser_identity checks the resource identity and import by identity (Terraform 1.12+).
+func TestAccAirflowUser_identity(t *testing.T) {
+	if os.Getenv("SKIP_AIRFLOW_USER_ROLES_TESTS") == "true" {
+		t.Skip("Skipping tests (SKIP_AIRFLOW_USER_ROLES_TESTS)")
+	}
+	rName := acctest.RandomWithPrefix("tf-acc-test")
+	resourceName := "airflow_user.test"
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckAirflowUserCheckDestroy,
+		TerraformVersionChecks: []tfversion.TerraformVersionCheck{
+			tfversion.SkipBelow(tfversion.Version1_12_0),
+		},
+		Steps: []resource.TestStep{
+			{
+				Config: testAccAirflowUserConfigBasic(rName, rName),
+				ConfigStateChecks: []statecheck.StateCheck{
+					statecheck.ExpectIdentityValueMatchesState(resourceName, tfjsonpath.New("username")),
+				},
+			},
+			{
+				ResourceName:    resourceName,
+				ImportState:     true,
+				ImportStateKind: resource.ImportBlockWithResourceIdentity,
+				// Config-only attributes are not recoverable on import.
+				ExpectNonEmptyPlan: true,
 			},
 		},
 	})

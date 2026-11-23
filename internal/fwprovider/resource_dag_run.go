@@ -13,6 +13,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
+	"github.com/hashicorp/terraform-plugin-framework/resource/identityschema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/mapplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
@@ -24,6 +25,7 @@ var (
 	_ resource.Resource                = &dagRunResource{}
 	_ resource.ResourceWithConfigure   = &dagRunResource{}
 	_ resource.ResourceWithImportState = &dagRunResource{}
+	_ resource.ResourceWithIdentity    = &dagRunResource{}
 )
 
 func newDagRunResource() resource.Resource {
@@ -158,6 +160,7 @@ func (r *dagRunResource) Create(ctx context.Context, req resource.CreateRequest,
 	}
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
+	resp.Diagnostics.Append(resp.Identity.Set(ctx, dagRunIdentity(plan.ID))...)
 }
 
 func (r *dagRunResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
@@ -177,6 +180,7 @@ func (r *dagRunResource) Read(ctx context.Context, req resource.ReadRequest, res
 	}
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
+	resp.Diagnostics.Append(resp.Identity.Set(ctx, dagRunIdentity(state.ID))...)
 }
 
 // Update is unreachable in practice: every configurable attribute uses
@@ -189,6 +193,7 @@ func (r *dagRunResource) Update(ctx context.Context, req resource.UpdateRequest,
 		return
 	}
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
+	resp.Diagnostics.Append(resp.Identity.Set(ctx, dagRunIdentity(plan.ID))...)
 }
 
 func (r *dagRunResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
@@ -213,8 +218,45 @@ func (r *dagRunResource) Delete(ctx context.Context, req resource.DeleteRequest,
 	}
 }
 
+// dagRunIdentityModel is the resource identity for airflow_dag_run.
+type dagRunIdentityModel struct {
+	DagID    types.String `tfsdk:"dag_id"`
+	DagRunID types.String `tfsdk:"dag_run_id"`
+}
+
+func (r *dagRunResource) IdentitySchema(_ context.Context, _ resource.IdentitySchemaRequest, resp *resource.IdentitySchemaResponse) {
+	resp.IdentitySchema = identityschema.Schema{
+		Attributes: map[string]identityschema.Attribute{
+			"dag_id": identityschema.StringAttribute{
+				RequiredForImport: true,
+				Description:       "The DAG ID.",
+			},
+			"dag_run_id": identityschema.StringAttribute{
+				RequiredForImport: true,
+				Description:       "The DAG run ID.",
+			},
+		},
+	}
+}
+
+// dagRunIdentity builds the resource identity from the DAG-ID:DAG-RUN-ID resource ID.
+func dagRunIdentity(id types.String) dagRunIdentityModel {
+	dagID, dagRunID, _ := parseDagRunID(id.ValueString())
+	return dagRunIdentityModel{DagID: types.StringValue(dagID), DagRunID: types.StringValue(dagRunID)}
+}
+
 func (r *dagRunResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
+	if req.ID != "" {
+		resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
+		return
+	}
+
+	var identity dagRunIdentityModel
+	resp.Diagnostics.Append(req.Identity.Get(ctx, &identity)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), fmt.Sprintf("%s:%s", identity.DagID.ValueString(), identity.DagRunID.ValueString()))...)
 }
 
 // readInto fetches the DAG run identified by m.ID and populates m. Returns false

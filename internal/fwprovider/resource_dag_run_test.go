@@ -7,7 +7,10 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/acctest"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/hashicorp/terraform-plugin-testing/statecheck"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
+	"github.com/hashicorp/terraform-plugin-testing/tfjsonpath"
+	"github.com/hashicorp/terraform-plugin-testing/tfversion"
 )
 
 var dagId = "example_bash_operator"
@@ -173,4 +176,35 @@ resource "airflow_dag_run" "test" {
   }
 }
 `, dagId)
+}
+
+// TestAccAirflowDagRun_identity checks the resource identity and import by identity (Terraform 1.12+).
+func TestAccAirflowDagRun_identity(t *testing.T) {
+	if os.Getenv("SKIP_AIRFLOW_DAG_TESTS") == "true" {
+		t.Skip("Skipping tests (SKIP_AIRFLOW_DAG_TESTS)")
+	}
+	resourceName := "airflow_dag_run.test"
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckAirflowDagRunCheckDestroy,
+		TerraformVersionChecks: []tfversion.TerraformVersionCheck{
+			tfversion.SkipBelow(tfversion.Version1_12_0),
+		},
+		Steps: []resource.TestStep{
+			{
+				Config: testAccAirflowDagRunConfigBasic(dagId),
+				ConfigStateChecks: []statecheck.StateCheck{
+					statecheck.ExpectIdentityValueMatchesState(resourceName, tfjsonpath.New("dag_id")),
+					statecheck.ExpectIdentityValueMatchesState(resourceName, tfjsonpath.New("dag_run_id")),
+				},
+			},
+			{
+				ResourceName:    resourceName,
+				ImportState:     true,
+				ImportStateKind: resource.ImportBlockWithResourceIdentity,
+			},
+		},
+	})
 }
