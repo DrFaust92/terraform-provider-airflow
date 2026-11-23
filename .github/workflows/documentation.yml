@@ -2,7 +2,7 @@ name: Documentation Checks
 on:
   push:
     branches:
-      - main
+      - master
   pull_request:
     paths:
       - .markdownlinkcheck.json
@@ -11,12 +11,17 @@ on:
       - .go-version
       - docs/**
 
+permissions:
+  contents: read
+
 jobs:
   markdown-link-check:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v5
-    - uses: gaurav-nelson/github-action-markdown-link-check@v1
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        persist-credentials: false
+    - uses: tcort/github-action-markdown-link-check@e7c7a18363c842693fadde5d41a3bd3573a7a225 # v1.1.2
       with:
         use-quiet-mode: 'yes'
         use-verbose-mode: 'yes'
@@ -26,8 +31,10 @@ jobs:
   markdown-lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
-      - uses: avto-dev/markdown-lint@v1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: avto-dev/markdown-lint@04d43ee9191307b50935a753da3b775ab695eceb # v1.5.0
         with:
           config: '.markdownlint.yml'
           args: 'docs'
