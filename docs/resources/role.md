@@ -3,12 +3,12 @@
 page_title: "airflow_role Resource - airflow"
 subcategory: ""
 description: |-
-  Provides an Airflow role. On Airflow 3, set the provider auth_manager_base_path (e.g. /auth/fab/v1).
+  Provides an Airflow role. On Airflow 3, set the provider auth_manager_base_path (e.g. /auth/fab/v1). The FAB auth manager grants every custom role can_read on Website (homepage access); it is not reported as drift unless you configure it.
 ---
 
 # airflow_role (Resource)
 
-Provides an Airflow role. On Airflow 3, set the provider `auth_manager_base_path` (e.g. `/auth/fab/v1`).
+Provides an Airflow role. On Airflow 3, set the provider `auth_manager_base_path` (e.g. `/auth/fab/v1`). The FAB auth manager grants every custom role `can_read` on `Website` (homepage access); it is not reported as drift unless you configure it.
 
 ## Example Usage
 
