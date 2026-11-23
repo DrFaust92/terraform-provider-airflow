@@ -238,6 +238,7 @@ resource "airflow_pool" "test" {
 // TestAccAirflowPool_upgradeFromSDKv2 ensures a pool created by the SDKv2
 // provider plans/applies cleanly under the current framework provider.
 func TestAccAirflowPool_upgradeFromSDKv2(t *testing.T) {
+	testAccPreCheckSDKv2Upgrade(t, false)
 	rName := acctest.RandomWithPrefix("tf-acc-test")
 	resourceName := "airflow_pool.test"
 

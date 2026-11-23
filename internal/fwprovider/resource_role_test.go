@@ -95,6 +95,7 @@ resource "airflow_role" "test" {
 // TestAccAirflowRole_upgradeFromSDKv2 guards the SDKv2 -> framework upgrade path
 // for the role's nested `action` block.
 func TestAccAirflowRole_upgradeFromSDKv2(t *testing.T) {
+	testAccPreCheckSDKv2Upgrade(t, true)
 	if os.Getenv("SKIP_AIRFLOW_USER_ROLES_TESTS") == "true" {
 		t.Skip("Skipping Airflow Roles and User Tests")
 	}

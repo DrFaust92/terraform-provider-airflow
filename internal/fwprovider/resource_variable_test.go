@@ -297,6 +297,7 @@ resource "airflow_variable" "test" {
 // SDKv2 provider plans/applies cleanly under the current framework provider
 // (guards the SDKv2 "" -> framework null state-representation upgrade path).
 func TestAccAirflowVariable_upgradeFromSDKv2(t *testing.T) {
+	testAccPreCheckSDKv2Upgrade(t, false)
 	rName := acctest.RandomWithPrefix("tf-acc-test")
 	resourceName := "airflow_variable.test"
 
