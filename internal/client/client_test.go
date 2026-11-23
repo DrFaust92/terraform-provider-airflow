@@ -8,7 +8,7 @@ import (
 
 func TestNewProviderConfig_authManagerBasePath(t *testing.T) {
 	t.Run("unset reuses the core client", func(t *testing.T) {
-		cfg, err := NewProviderConfig("https://airflow.example.com", "token", "", "", false, "/api/v1", "", "")
+		cfg, err := NewProviderConfig("https://airflow.example.com", "token", "", "", false, "/api/v1", "", "", false)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -18,7 +18,7 @@ func TestNewProviderConfig_authManagerBasePath(t *testing.T) {
 	})
 
 	t.Run("unset defaults to FAB on api v2", func(t *testing.T) {
-		cfg, err := NewProviderConfig("https://airflow.example.com", "token", "", "", false, "/api/v2", "", "")
+		cfg, err := NewProviderConfig("https://airflow.example.com", "token", "", "", false, "/api/v2", "", "", false)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -28,7 +28,7 @@ func TestNewProviderConfig_authManagerBasePath(t *testing.T) {
 	})
 
 	t.Run("set uses its own server URL", func(t *testing.T) {
-		cfg, err := NewProviderConfig("https://airflow.example.com/prefix/", "token", "", "", false, "/api/v2", "", "/auth/fab/v1")
+		cfg, err := NewProviderConfig("https://airflow.example.com/prefix/", "token", "", "", false, "/api/v2", "", "/auth/fab/v1", false)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -41,8 +41,23 @@ func TestNewProviderConfig_authManagerBasePath(t *testing.T) {
 	})
 }
 
-func TestNewProviderConfig_authContexts(t *testing.T) {
-	cfg, err := NewProviderConfig("https://airflow.example.com", "token", "admin", "secret", false, "/api/v2", "", "")
+func TestNewProviderConfig_authContextsTokenDefault(t *testing.T) {
+	cfg, err := NewProviderConfig("https://airflow.example.com", "token", "admin", "secret", false, "/api/v2", "", "", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for name, ctx := range map[string]interface{ Value(any) any }{"core": cfg.AuthContext, "auth manager": cfg.AuthManagerAuthContext} {
+		if got, _ := ctx.Value(airflow.ContextAccessToken).(string); got != "token" {
+			t.Errorf("%s token = %q, want token", name, got)
+		}
+		if _, ok := ctx.Value(airflow.ContextBasicAuth).(airflow.BasicAuth); ok {
+			t.Errorf("%s context must not carry basic auth when a token is set", name)
+		}
+	}
+}
+
+func TestNewProviderConfig_authContextsBasicForAuthManager(t *testing.T) {
+	cfg, err := NewProviderConfig("https://airflow.example.com", "token", "admin", "secret", false, "/api/v2", "", "", true)
 	if err != nil {
 		t.Fatal(err)
 	}

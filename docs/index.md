@@ -130,14 +130,12 @@ curl -X POST https://airflow-server.net/auth/token \
 
 Airflow v3 serves roles and users from the auth manager (`/auth/fab/v1` for FAB), not the core API. When `base_path` is `/api/v2`, `airflow_role`, `airflow_user` and `airflow_user_roles` use `/auth/fab/v1` by default. Set `auth_manager_base_path` to override it.
 
-The FAB API does not accept the Airflow 3 JWT token. When `username` and `password` are set alongside `oauth2_token`, the provider uses the token for the core API and basic auth for the FAB API, which requires the FAB `basic_auth` backend (`[fab] auth_backends = airflow.providers.fab.auth_manager.api.auth.backend.basic_auth`).
+The FAB auth manager API accepts the same `oauth2_token` as the core API with FAB provider 3.2+ (users) / 3.3+ (roles), as shipped with Airflow 3.2. Older FAB releases only accept basic auth on that API: set `username`, `password` and `auth_manager_basic_auth = true` (and enable the FAB `basic_auth` backend, `[fab] auth_backends = airflow.providers.fab.auth_manager.api.auth.backend.basic_auth`) to use the token for the core API and basic auth for roles and users.
 
 ```terraform
 provider "airflow" {
   base_endpoint          = "https://airflow-server.net"
   oauth2_token           = "token"
-  username               = "admin"
-  password               = "admin"
   base_path              = "/api/v2"
   auth_manager_base_path = "/auth/fab/v1" # optional, this is the default for /api/v2
 }
@@ -148,7 +146,8 @@ provider "airflow" {
 
 ### Optional
 
-- `auth_manager_base_path` (String) Base path for the auth manager API used by `airflow_role`, `airflow_user` and `airflow_user_roles`, Defaults to `/auth/fab/v1` when `base_path` is `/api/v2` (Airflow 3), otherwise to `base_path`.
+- `auth_manager_base_path` (String) Base path for the auth manager API used by `airflow_role`, `airflow_user` and `airflow_user_roles`. Defaults to `/auth/fab/v1` when `base_path` is `/api/v2` (Airflow 3), otherwise to `base_path`.
+- `auth_manager_basic_auth` (Boolean) Use `username`/`password` basic auth for the auth manager API even when `oauth2_token` is set. Needed for FAB provider releases before 3.2 (users) / 3.3 (roles), which do not accept the Airflow 3 token. Can also be set with `AIRFLOW_AUTH_MANAGER_BASIC_AUTH`.
 - `base_endpoint` (String)
 - `base_path` (String) Base path for Airflow API endpoints
 - `disable_ssl_verification` (Boolean) Disable SSL verification

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"slices"
 
 	"github.com/apache/airflow-client-go/airflow"
 	"github.com/drfaust92/terraform-provider-airflow/internal/client"
@@ -51,7 +52,7 @@ func (r *roleResource) Metadata(_ context.Context, req resource.MetadataRequest,
 
 func (r *roleResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "Provides an Airflow role. On Airflow 3, set the provider `auth_manager_base_path` (e.g. `/auth/fab/v1`).",
+		MarkdownDescription: "Provides an Airflow role. On Airflow 3, set the provider `auth_manager_base_path` (e.g. `/auth/fab/v1`). The FAB auth manager grants every custom role `can_read` on `Website` (homepage access); it is not reported as drift unless you configure it.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				MarkdownDescription: "The role name.",
@@ -141,6 +142,7 @@ func (r *roleResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 		return
 	}
 
+	prior := state.Actions
 	found := r.readInto(&state, &resp.Diagnostics)
 	if resp.Diagnostics.HasError() {
 		return
@@ -149,6 +151,7 @@ func (r *roleResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 		resp.State.RemoveResource(ctx)
 		return
 	}
+	state.Actions = withoutImplicitRoleActions(state.Actions, prior)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 	resp.Diagnostics.Append(resp.Identity.Set(ctx, roleIdentity(state.ID))...)
@@ -236,6 +239,28 @@ func (r *roleResource) readInto(m *roleResourceModel, diags *diag.Diagnostics) (
 	m.Name = types.StringValue(role.GetName())
 	m.Actions = flattenRoleActions(role.Actions)
 	return true
+}
+
+// implicitRoleAction is the permission the FAB auth manager adds to every
+// custom role (homepage access; see add_homepage_access_to_custom_roles) and
+// re-adds on sync, so it cannot be managed away.
+var implicitRoleAction = roleActionModel{
+	Action:   types.StringValue("can_read"),
+	Resource: types.StringValue("Website"),
+}
+
+// withoutImplicitRoleActions drops the FAB-managed implicit permission from
+// actions read back from the API unless prior state already tracked it, so
+// roles that do not configure it do not show a perpetual diff.
+func withoutImplicitRoleActions(actions, prior []roleActionModel) []roleActionModel {
+	if slices.Contains(prior, implicitRoleAction) {
+		return actions
+	}
+	out := slices.DeleteFunc(slices.Clone(actions), func(a roleActionModel) bool { return a == implicitRoleAction })
+	if len(out) == 0 {
+		return nil
+	}
+	return out
 }
 
 func expandRoleActions(actions []roleActionModel) []airflow.ActionResource {

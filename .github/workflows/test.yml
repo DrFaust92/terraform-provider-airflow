@@ -58,9 +58,85 @@ jobs:
           echo "AIRFLOW_BASE_ENDPOINT=http://localhost:8080" >> $GITHUB_ENV
           echo "SKIP_AIRFLOW_DAG_TESTS=true" >> $GITHUB_ENV
           echo "AIRFLOW_API_BASE_PATH=/api/v2" >> $GITHUB_ENV
-          # roles/users go through the FAB API, which uses basic auth on Airflow 3
+          # chart 1.18 ships a FAB provider that only accepts basic auth on the
+          # auth manager API, so opt into it for roles/users.
           echo "AIRFLOW_API_USERNAME=admin" >> $GITHUB_ENV
           echo "AIRFLOW_API_PASSWORD=admin" >> $GITHUB_ENV
+          echo "AIRFLOW_AUTH_MANAGER_BASIC_AUTH=true" >> $GITHUB_ENV
+
+
+      - name: Obtain Airflow JWT token
+        run: |
+          set -euo pipefail
+          kubectl port-forward svc/airflow-api-server 8080:8080 &
+          sleep 5  # wait for port-forward to be established
+          # Try to install jq if it's not present
+          if ! command -v jq >/dev/null 2>&1; then
+            echo "jq not found, installing..."
+            sudo apt-get update && sudo apt-get install -y jq
+          fi
+
+          resp=$(curl -s -X POST "${AIRFLOW_BASE_ENDPOINT}/auth/token" -H 'Content-Type: application/json' -d '{"username": "admin", "password": "admin"}')
+          # extract token - try common fields
+          token=$(echo "$resp" | jq -r '.access_token // .token // .access // empty')
+          if [ -z "$token" ] || [ "$token" = "null" ]; then
+            echo "Failed to obtain token from response: $resp"
+            exit 1
+          fi
+          echo "AIRFLOW_OAUTH2_TOKEN=$token" >> $GITHUB_ENV
+
+      - name: Run integration tests
+        run: |
+          ACCTEST_PARALLELISM=3 make testacc
+  testV3:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
+        with:
+          go-version-file: "go.mod"
+          cache: true
+      
+      - name: Create k8s Kind Cluster
+        uses: helm/kind-action@ea822c7bf1874f08e5a491df991c228edffc3376 # v1.15.2
+
+      - name: Add Airflow Helm repository
+        run: helm repo add apache-airflow https://airflow.apache.org && helm repo update
+      
+      - name: Install Airflow
+        run: |
+          # airflow v3.2 helm chart (FAB auth manager API accepts the JWT)
+          helm upgrade --install airflow apache-airflow/airflow --version 1.22.0 \
+            --set postgresql.image.repository=bitnamilegacy/postgresql \
+            --set postgresql.image.tag=16.1.0-debian-11-r15 \
+            --set executor=KubernetesExecutor \
+            --set workers.replicas=0 \
+            --set redis.enabled=false \
+            --set triggerer.enabled=false \
+            --set dagProcessor.enabled=false \
+            --set scheduler.enabled=false \
+            --set statsd.enabled=false \
+            --set createUserJob.useHelmHooks=false \
+            --set createUserJob.applyCustomEnv=false \
+            --set migrateDatabaseJob.useHelmHooks=false \
+            --set migrateDatabaseJob.applyCustomEnv=false \
+            --set webserver.resources.requests.memory=1Gi \
+            --set webserver.resources.limits.memory=1Gi \
+            --set config.api.auth_backend=airflow.api.auth.backend.basic_auth \
+            --timeout 3m \
+            --wait
+
+      - name: Set Airflow environment variable
+        run: |
+          echo "AIRFLOW_BASE_ENDPOINT=http://localhost:8080" >> $GITHUB_ENV
+          echo "SKIP_AIRFLOW_DAG_TESTS=true" >> $GITHUB_ENV
+          echo "AIRFLOW_API_BASE_PATH=/api/v2" >> $GITHUB_ENV
+          # Airflow 3.2 / FAB 3.3+: the auth manager API accepts the same token.
 
 
       - name: Obtain Airflow JWT token

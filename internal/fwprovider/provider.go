@@ -5,6 +5,7 @@ package fwprovider
 import (
 	"context"
 	"os"
+	"strconv"
 
 	"github.com/drfaust92/terraform-provider-airflow/internal/client"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
@@ -72,7 +73,11 @@ func (p *airflowProvider) Schema(_ context.Context, _ fwprovider.SchemaRequest, 
 			},
 			"auth_manager_base_path": schema.StringAttribute{
 				Optional:    true,
-				Description: "Base path for the auth manager API used by `airflow_role`, `airflow_user` and `airflow_user_roles`, Defaults to `/auth/fab/v1` when `base_path` is `/api/v2` (Airflow 3), otherwise to `base_path`.",
+				Description: "Base path for the auth manager API used by `airflow_role`, `airflow_user` and `airflow_user_roles`. Defaults to `/auth/fab/v1` when `base_path` is `/api/v2` (Airflow 3), otherwise to `base_path`.",
+			},
+			"auth_manager_basic_auth": schema.BoolAttribute{
+				Optional:    true,
+				Description: "Use `username`/`password` basic auth for the auth manager API even when `oauth2_token` is set. Needed for FAB provider releases before 3.2 (users) / 3.3 (roles), which do not accept the Airflow 3 token. Can also be set with `AIRFLOW_AUTH_MANAGER_BASIC_AUTH`.",
 			},
 			"session_cookie": schema.StringAttribute{
 				Optional:    true,
@@ -92,6 +97,7 @@ type airflowProviderModel struct {
 	BasePath               types.String `tfsdk:"base_path"`
 	SessionCookie          types.String `tfsdk:"session_cookie"`
 	AuthManagerBasePath    types.String `tfsdk:"auth_manager_base_path"`
+	AuthManagerBasicAuth   types.Bool   `tfsdk:"auth_manager_basic_auth"`
 }
 
 func (p *airflowProvider) Configure(_ context.Context, req fwprovider.ConfigureRequest, resp *fwprovider.ConfigureResponse) {
@@ -110,6 +116,7 @@ func (p *airflowProvider) Configure(_ context.Context, req fwprovider.ConfigureR
 	basePath := stringOrEnv(config.BasePath, "AIRFLOW_API_BASE_PATH", defaultBasePath)
 	sessionCookie := stringOrEnv(config.SessionCookie, "AIRFLOW_SESSION_COOKIE", "")
 	authManagerBasePath := stringOrEnv(config.AuthManagerBasePath, "AIRFLOW_AUTH_MANAGER_BASE_PATH", "")
+	authManagerBasicAuth := boolOrEnv(config.AuthManagerBasicAuth, "AIRFLOW_AUTH_MANAGER_BASIC_AUTH")
 	disableSSL := config.DisableSSLVerification.ValueBool()
 
 	if endpoint == "" {
@@ -121,7 +128,7 @@ func (p *airflowProvider) Configure(_ context.Context, req fwprovider.ConfigureR
 		return
 	}
 
-	cfg, err := client.NewProviderConfig(endpoint, oauth2Token, username, password, disableSSL, basePath, sessionCookie, authManagerBasePath)
+	cfg, err := client.NewProviderConfig(endpoint, oauth2Token, username, password, disableSSL, basePath, sessionCookie, authManagerBasePath, authManagerBasicAuth)
 	if err != nil {
 		resp.Diagnostics.AddError("Unable to configure Airflow API client", err.Error())
 		return
@@ -164,6 +171,17 @@ func (p *airflowProvider) ListResources(_ context.Context) []func() list.ListRes
 		newPoolListResource,
 		newConnectionListResource,
 	}
+}
+
+// boolOrEnv returns the configured value when known and non-null, otherwise
+// the named environment variable parsed with strconv.ParseBool (false if
+// unset or invalid).
+func boolOrEnv(v types.Bool, envKey string) bool {
+	if !v.IsNull() && !v.IsUnknown() {
+		return v.ValueBool()
+	}
+	b, _ := strconv.ParseBool(os.Getenv(envKey))
+	return b
 }
 
 // stringOrEnv returns the configured value when known and non-null, otherwise
