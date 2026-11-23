@@ -32,7 +32,7 @@ type ProviderConfig struct {
 
 // NewProviderConfig builds the Airflow API client and auth context from the
 // already-resolved provider configuration values.
-func NewProviderConfig(endpoint, oauth2Token, username, password string, disableSSL bool, basePath, sessionCookie, authManagerBasePath string) (ProviderConfig, error) {
+func NewProviderConfig(endpoint, oauth2Token, username, password string, disableSSL bool, basePath, sessionCookie, authManagerBasePath string, authManagerBasicAuth bool) (ProviderConfig, error) {
 	transport := http.DefaultTransport
 	if disableSSL {
 		transport = &http.Transport{
@@ -58,11 +58,12 @@ func NewProviderConfig(endpoint, oauth2Token, username, password string, disable
 	})
 
 	// Only one Authorization header can be sent, so each API gets a single
-	// credential. The core API prefers the token; the auth manager API (FAB)
-	// prefers basic auth, as FAB does not accept Airflow 3 JWT tokens.
+	// credential, and the token wins when both are set. The FAB auth manager
+	// API accepts the Airflow 3 token from FAB provider 3.2/3.3 on; older FAB
+	// releases only accept basic auth, which authManagerBasicAuth opts into.
 	ctx, authManagerCtx := context.Background(), context.Background()
 	switch {
-	case oauth2Token != "" && username != "":
+	case oauth2Token != "" && username != "" && authManagerBasicAuth:
 		ctx, authManagerCtx = tokenCtx, basicCtx
 	case oauth2Token != "":
 		ctx, authManagerCtx = tokenCtx, tokenCtx
