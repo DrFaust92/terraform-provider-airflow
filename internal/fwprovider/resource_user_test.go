@@ -76,7 +76,7 @@ func testAccCheckAirflowUserCheckDestroy(s *terraform.State) error {
 			continue
 		}
 
-		user, res, err := cfg.ApiClient.UserApi.GetUser(cfg.AuthContext, rs.Primary.ID).Execute()
+		user, res, err := cfg.AuthManagerApiClient.UserApi.GetUser(cfg.AuthManagerAuthContext, rs.Primary.ID).Execute()
 		if err == nil {
 			if user.GetUsername() == rs.Primary.ID {
 				return fmt.Errorf("Airflow User (%s) still exists.", rs.Primary.ID)
@@ -214,6 +214,7 @@ resource "airflow_user" "test" {
 // TestAccAirflowUser_upgradeFromSDKv2 guards the SDKv2 -> framework upgrade path
 // for airflow_user (and the airflow_role it references).
 func TestAccAirflowUser_upgradeFromSDKv2(t *testing.T) {
+	testAccPreCheckSDKv2Upgrade(t, true)
 	if os.Getenv("SKIP_AIRFLOW_USER_ROLES_TESTS") == "true" {
 		t.Skip("Skipping Airflow Roles and User Tests")
 	}

@@ -268,6 +268,7 @@ resource "airflow_connection" "test" {
 // creates the connection with the last SDKv2 release; step 2 applies it with the
 // current (framework) provider and must succeed and converge to a stable plan.
 func TestAccAirflowConnection_upgradeFromSDKv2(t *testing.T) {
+	testAccPreCheckSDKv2Upgrade(t, false)
 	rName := acctest.RandomWithPrefix("tf-acc-test")
 	resourceName := "airflow_connection.test"
 

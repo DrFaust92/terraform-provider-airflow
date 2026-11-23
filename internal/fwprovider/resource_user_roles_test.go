@@ -1,12 +1,8 @@
 package fwprovider
 
 import (
-	"context"
 	"fmt"
-	"net/http"
-	"net/url"
 	"os"
-	"strings"
 	"testing"
 
 	"github.com/apache/airflow-client-go/airflow"
@@ -74,7 +70,7 @@ func testAccCheckAirflowUserRolesCheckDestroy(s *terraform.State) error {
 			continue
 		}
 
-		user, res, err := cfg.ApiClient.UserApi.GetUser(cfg.AuthContext, rs.Primary.ID).Execute()
+		user, res, err := cfg.AuthManagerApiClient.UserApi.GetUser(cfg.AuthManagerAuthContext, rs.Primary.ID).Execute()
 		if err == nil {
 			if len(user.Roles) != 0 {
 				return fmt.Errorf("Airflow User (%s) still have some roles.", rs.Primary.ID)
@@ -85,7 +81,7 @@ func testAccCheckAirflowUserRolesCheckDestroy(s *terraform.State) error {
 			continue
 		}
 	}
-	_, _ = cfg.ApiClient.UserApi.DeleteUser(cfg.AuthContext, accName).Execute()
+	_, _ = cfg.AuthManagerApiClient.UserApi.DeleteUser(cfg.AuthManagerAuthContext, accName).Execute()
 
 	return nil
 }
@@ -137,34 +133,11 @@ resource "airflow_user_roles" "test" {
 
 func testAccPreCheckCreateUser(t *testing.T) {
 	testAccPreCheck(t)
-	endpoint := os.Getenv("AIRFLOW_BASE_ENDPOINT")
-	u, err := url.Parse(endpoint)
+	cfg, err := testAccProviderConfig()
 	if err != nil {
-		t.Fatalf("failed to initialise Airflow at `%s`: %s", endpoint, err)
+		t.Fatalf("failed to initialise Airflow client: %s", err)
 	}
-
-	client := &http.Client{
-		Transport: http.DefaultTransport,
-	}
-	path := strings.TrimSuffix(u.Path, "/")
-	apiClient := airflow.NewAPIClient(&airflow.Configuration{
-		Scheme:     u.Scheme,
-		Host:       u.Host,
-		Debug:      true,
-		HTTPClient: client,
-		Servers: airflow.ServerConfigurations{
-			{
-				URL:         fmt.Sprint(path, "/api/v1"),
-				Description: "Apache Airflow Stable API.",
-			},
-		},
-	})
-	authContext := context.Background()
-	cred := airflow.BasicAuth{
-		UserName: os.Getenv("AIRFLOW_API_USERNAME"),
-		Password: os.Getenv("AIRFLOW_API_PASSWORD"),
-	}
-	authContext = context.WithValue(authContext, airflow.ContextBasicAuth, cred)
+	apiClient, authContext := cfg.AuthManagerApiClient, cfg.AuthManagerAuthContext
 
 	email := acctest.RandomWithPrefix("tf-role-email-test")
 	firstName := acctest.RandomWithPrefix("tf-role-first-name-test")
@@ -189,6 +162,7 @@ func testAccPreCheckCreateUser(t *testing.T) {
 // TestAccAirflowUserRoles_upgradeFromSDKv2 guards the SDKv2 -> framework upgrade
 // path for airflow_user_roles (and the airflow_role it references).
 func TestAccAirflowUserRoles_upgradeFromSDKv2(t *testing.T) {
+	testAccPreCheckSDKv2Upgrade(t, true)
 	if os.Getenv("SKIP_AIRFLOW_USER_ROLES_TESTS") == "true" {
 		t.Skip("Skipping Airflow Roles and User Tests")
 	}

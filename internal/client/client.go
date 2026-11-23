@@ -15,15 +15,24 @@ import (
 	"github.com/apache/airflow-client-go/airflow"
 )
 
+// DefaultAuthManagerBasePathV3 is the FAB auth manager API path used for users
+// and roles on Airflow 3 when no auth manager base path is configured.
+const DefaultAuthManagerBasePathV3 = "/auth/fab/v1"
+
 // ProviderConfig is the configured Airflow client handed to each resource.
 type ProviderConfig struct {
-	ApiClient   *airflow.APIClient
-	AuthContext context.Context
+	ApiClient *airflow.APIClient
+	// AuthManagerApiClient serves roles and users; it is ApiClient unless an
+	// auth manager base path is set.
+	AuthManagerApiClient *airflow.APIClient
+	AuthContext          context.Context
+	// AuthManagerAuthContext carries the credentials for AuthManagerApiClient.
+	AuthManagerAuthContext context.Context
 }
 
 // NewProviderConfig builds the Airflow API client and auth context from the
 // already-resolved provider configuration values.
-func NewProviderConfig(endpoint, oauth2Token, username, password string, disableSSL bool, basePath, sessionCookie string) (ProviderConfig, error) {
+func NewProviderConfig(endpoint, oauth2Token, username, password string, disableSSL bool, basePath, sessionCookie, authManagerBasePath string) (ProviderConfig, error) {
 	transport := http.DefaultTransport
 	if disableSSL {
 		transport = &http.Transport{
@@ -38,22 +47,28 @@ func NewProviderConfig(endpoint, oauth2Token, username, password string, disable
 		return ProviderConfig{}, fmt.Errorf("invalid base_endpoint: %w", err)
 	}
 
-	ctx := context.Background()
-
-	if oauth2Token != "" {
-		ctx = context.WithValue(ctx, airflow.ContextAccessToken, oauth2Token)
+	if username != "" && password == "" {
+		return ProviderConfig{}, fmt.Errorf("found username for basic auth, but password not specified")
 	}
 
-	if username != "" {
-		if password == "" {
-			return ProviderConfig{}, fmt.Errorf("found username for basic auth, but password not specified")
-		}
-		log.Printf("[DEBUG] Using API Basic Auth")
+	tokenCtx := context.WithValue(context.Background(), airflow.ContextAccessToken, oauth2Token)
+	basicCtx := context.WithValue(context.Background(), airflow.ContextBasicAuth, airflow.BasicAuth{
+		UserName: username,
+		Password: password,
+	})
 
-		ctx = context.WithValue(ctx, airflow.ContextBasicAuth, airflow.BasicAuth{
-			UserName: username,
-			Password: password,
-		})
+	// Only one Authorization header can be sent, so each API gets a single
+	// credential. The core API prefers the token; the auth manager API (FAB)
+	// prefers basic auth, as FAB does not accept Airflow 3 JWT tokens.
+	ctx, authManagerCtx := context.Background(), context.Background()
+	switch {
+	case oauth2Token != "" && username != "":
+		ctx, authManagerCtx = tokenCtx, basicCtx
+	case oauth2Token != "":
+		ctx, authManagerCtx = tokenCtx, tokenCtx
+	case username != "":
+		log.Printf("[DEBUG] Using API Basic Auth")
+		ctx, authManagerCtx = basicCtx, basicCtx
 	}
 
 	path := strings.TrimSuffix(u.Path, "/")
@@ -64,22 +79,38 @@ func NewProviderConfig(endpoint, oauth2Token, username, password string, disable
 		log.Printf("[DEBUG] Using session cookie authentication")
 	}
 
-	clientConf := &airflow.Configuration{
-		Scheme:        u.Scheme,
-		Host:          u.Host,
-		DefaultHeader: defaultHeaders,
-		Debug:         true,
-		HTTPClient:    httpClient,
-		Servers: airflow.ServerConfigurations{
-			{
-				URL:         fmt.Sprint(path, basePath),
-				Description: "Apache Airflow Stable API.",
+	newClient := func(apiPath, description string) *airflow.APIClient {
+		return airflow.NewAPIClient(&airflow.Configuration{
+			Scheme:        u.Scheme,
+			Host:          u.Host,
+			DefaultHeader: defaultHeaders,
+			Debug:         true,
+			HTTPClient:    httpClient,
+			Servers: airflow.ServerConfigurations{
+				{
+					URL:         fmt.Sprint(path, apiPath),
+					Description: description,
+				},
 			},
-		},
+		})
+	}
+
+	// Airflow 3 serves users and roles from the FAB auth manager rather than
+	// the core API, so default to it when the core API is v2.
+	if authManagerBasePath == "" && strings.TrimSuffix(basePath, "/") == "/api/v2" {
+		authManagerBasePath = DefaultAuthManagerBasePathV3
+	}
+
+	apiClient := newClient(basePath, "Apache Airflow Stable API.")
+	authManagerClient := apiClient
+	if authManagerBasePath != "" {
+		authManagerClient = newClient(authManagerBasePath, "Apache Airflow auth manager API.")
 	}
 
 	return ProviderConfig{
-		ApiClient:   airflow.NewAPIClient(clientConf),
-		AuthContext: ctx,
+		ApiClient:              apiClient,
+		AuthManagerApiClient:   authManagerClient,
+		AuthContext:            ctx,
+		AuthManagerAuthContext: authManagerCtx,
 	}, nil
 }

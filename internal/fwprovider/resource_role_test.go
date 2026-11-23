@@ -64,7 +64,7 @@ func testAccCheckAirflowRoleCheckDestroy(s *terraform.State) error {
 			continue
 		}
 
-		role, res, err := cfg.ApiClient.RoleApi.GetRole(cfg.AuthContext, rs.Primary.ID).Execute()
+		role, res, err := cfg.AuthManagerApiClient.RoleApi.GetRole(cfg.AuthManagerAuthContext, rs.Primary.ID).Execute()
 		if err == nil {
 			if role.GetName() == rs.Primary.ID {
 				return fmt.Errorf("Airflow Role (%s) still exists.", rs.Primary.ID)
@@ -95,6 +95,7 @@ resource "airflow_role" "test" {
 // TestAccAirflowRole_upgradeFromSDKv2 guards the SDKv2 -> framework upgrade path
 // for the role's nested `action` block.
 func TestAccAirflowRole_upgradeFromSDKv2(t *testing.T) {
+	testAccPreCheckSDKv2Upgrade(t, true)
 	if os.Getenv("SKIP_AIRFLOW_USER_ROLES_TESTS") == "true" {
 		t.Skip("Skipping Airflow Roles and User Tests")
 	}
