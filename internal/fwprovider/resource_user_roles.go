@@ -153,7 +153,7 @@ func (r *userRolesResource) Delete(ctx context.Context, req resource.DeleteReque
 	// Mirror the SDKv2 resource: clear the user's roles, then delete the user.
 	_ = r.patchRoles(username, []airflow.UserCollectionItemRoles{})
 
-	httpResp, err := r.config.AuthManagerApiClient.UserApi.DeleteUser(r.config.AuthContext, username).Execute()
+	httpResp, err := r.config.AuthManagerApiClient.UserApi.DeleteUser(r.config.AuthManagerAuthContext, username).Execute()
 	if err != nil {
 		if httpResp != nil && httpResp.StatusCode == http.StatusNotFound {
 			return
@@ -169,7 +169,7 @@ func (r *userRolesResource) ImportState(ctx context.Context, req resource.Import
 // patchRoles sets the user's roles via a roles-only update mask, matching the
 // SDKv2 resource which fills the required name fields with the username.
 func (r *userRolesResource) patchRoles(username string, roles []airflow.UserCollectionItemRoles) error {
-	_, httpResp, err := r.config.AuthManagerApiClient.UserApi.PatchUser(r.config.AuthContext, username).
+	_, httpResp, err := r.config.AuthManagerApiClient.UserApi.PatchUser(r.config.AuthManagerAuthContext, username).
 		UpdateMask([]string{"roles"}).
 		User(airflow.User{
 			Roles:     roles,
@@ -189,7 +189,7 @@ func (r *userRolesResource) patchRoles(username string, roles []airflow.UserColl
 func (r *userRolesResource) readInto(m *userRolesResourceModel, diags *diag.Diagnostics) (found bool) {
 	id := m.ID.ValueString()
 
-	user, httpResp, err := r.config.AuthManagerApiClient.UserApi.GetUser(r.config.AuthContext, id).Execute()
+	user, httpResp, err := r.config.AuthManagerApiClient.UserApi.GetUser(r.config.AuthManagerAuthContext, id).Execute()
 	if httpResp != nil && httpResp.StatusCode == http.StatusNotFound {
 		return false
 	}

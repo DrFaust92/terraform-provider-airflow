@@ -1,6 +1,10 @@
 package client
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/apache/airflow-client-go/airflow"
+)
 
 func TestNewProviderConfig_authManagerBasePath(t *testing.T) {
 	t.Run("unset reuses the core client", func(t *testing.T) {
@@ -35,4 +39,23 @@ func TestNewProviderConfig_authManagerBasePath(t *testing.T) {
 			t.Errorf("auth manager server URL = %q, want %q", got, want)
 		}
 	})
+}
+
+func TestNewProviderConfig_authContexts(t *testing.T) {
+	cfg, err := NewProviderConfig("https://airflow.example.com", "token", "admin", "secret", false, "/api/v2", "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := cfg.AuthContext.Value(airflow.ContextBasicAuth).(airflow.BasicAuth); ok {
+		t.Error("core API context must not carry basic auth when a token is set")
+	}
+	if got, _ := cfg.AuthContext.Value(airflow.ContextAccessToken).(string); got != "token" {
+		t.Errorf("core API token = %q, want token", got)
+	}
+	if _, ok := cfg.AuthManagerAuthContext.Value(airflow.ContextAccessToken).(string); ok {
+		t.Error("auth manager context must not carry the token when basic auth is set")
+	}
+	if got, _ := cfg.AuthManagerAuthContext.Value(airflow.ContextBasicAuth).(airflow.BasicAuth); got.UserName != "admin" {
+		t.Errorf("auth manager basic user = %q, want admin", got.UserName)
+	}
 }

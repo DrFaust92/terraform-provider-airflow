@@ -49,6 +49,7 @@ jobs:
             --set webserver.resources.requests.memory=1Gi \
             --set webserver.resources.limits.memory=1Gi \
             --set config.api.auth_backend=airflow.api.auth.backend.basic_auth \
+            --set config.fab.auth_backends=airflow.providers.fab.auth_manager.api.auth.backend.basic_auth \
             --timeout 3m \
             --wait
 
@@ -57,6 +58,9 @@ jobs:
           echo "AIRFLOW_BASE_ENDPOINT=http://localhost:8080" >> $GITHUB_ENV
           echo "SKIP_AIRFLOW_DAG_TESTS=true" >> $GITHUB_ENV
           echo "AIRFLOW_API_BASE_PATH=/api/v2" >> $GITHUB_ENV
+          # roles/users go through the FAB API, which uses basic auth on Airflow 3
+          echo "AIRFLOW_API_USERNAME=admin" >> $GITHUB_ENV
+          echo "AIRFLOW_API_PASSWORD=admin" >> $GITHUB_ENV
 
 
       - name: Obtain Airflow JWT token

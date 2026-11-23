@@ -130,10 +130,14 @@ curl -X POST https://airflow-server.net/auth/token \
 
 Airflow v3 serves roles and users from the auth manager (`/auth/fab/v1` for FAB), not the core API. When `base_path` is `/api/v2`, `airflow_role`, `airflow_user` and `airflow_user_roles` use `/auth/fab/v1` by default. Set `auth_manager_base_path` to override it.
 
+The FAB API does not accept the Airflow 3 JWT token. When `username` and `password` are set alongside `oauth2_token`, the provider uses the token for the core API and basic auth for the FAB API, which requires the FAB `basic_auth` backend (`[fab] auth_backends = airflow.providers.fab.auth_manager.api.auth.backend.basic_auth`).
+
 ```terraform
 provider "airflow" {
   base_endpoint          = "https://airflow-server.net"
   oauth2_token           = "token"
+  username               = "admin"
+  password               = "admin"
   base_path              = "/api/v2"
   auth_manager_base_path = "/auth/fab/v1" # optional, this is the default for /api/v2
 }

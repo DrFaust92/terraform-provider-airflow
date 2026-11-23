@@ -192,7 +192,7 @@ func (r *userResource) Create(ctx context.Context, req resource.CreateRequest, r
 		return
 	}
 
-	_, httpResp, err := r.config.AuthManagerApiClient.UserApi.PostUser(r.config.AuthContext).User(airflow.User{
+	_, httpResp, err := r.config.AuthManagerApiClient.UserApi.PostUser(r.config.AuthManagerAuthContext).User(airflow.User{
 		Email:     &email,
 		FirstName: &firstName,
 		LastName:  &lastName,
@@ -264,7 +264,7 @@ func (r *userResource) Update(ctx context.Context, req resource.UpdateRequest, r
 		return
 	}
 
-	_, httpResp, err := r.config.AuthManagerApiClient.UserApi.PatchUser(r.config.AuthContext, username).User(airflow.User{
+	_, httpResp, err := r.config.AuthManagerApiClient.UserApi.PatchUser(r.config.AuthManagerAuthContext, username).User(airflow.User{
 		Email:     &email,
 		FirstName: &firstName,
 		LastName:  &lastName,
@@ -295,7 +295,7 @@ func (r *userResource) Delete(ctx context.Context, req resource.DeleteRequest, r
 	}
 
 	username := state.ID.ValueString()
-	httpResp, err := r.config.AuthManagerApiClient.UserApi.DeleteUser(r.config.AuthContext, username).Execute()
+	httpResp, err := r.config.AuthManagerApiClient.UserApi.DeleteUser(r.config.AuthManagerAuthContext, username).Execute()
 	if err != nil {
 		if httpResp != nil && httpResp.StatusCode == http.StatusNotFound {
 			return
@@ -328,7 +328,7 @@ func (r *userResource) readComputedInto(m *userResourceModel, diags *diag.Diagno
 func (r *userResource) readInto(m *userResourceModel, diags *diag.Diagnostics) (found bool) {
 	id := m.ID.ValueString()
 
-	user, httpResp, err := r.config.AuthManagerApiClient.UserApi.GetUser(r.config.AuthContext, id).Execute()
+	user, httpResp, err := r.config.AuthManagerApiClient.UserApi.GetUser(r.config.AuthManagerAuthContext, id).Execute()
 	if httpResp != nil && httpResp.StatusCode == http.StatusNotFound {
 		return false
 	}

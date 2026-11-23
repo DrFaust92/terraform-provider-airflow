@@ -26,6 +26,8 @@ type ProviderConfig struct {
 	// auth manager base path is set.
 	AuthManagerApiClient *airflow.APIClient
 	AuthContext          context.Context
+	// AuthManagerAuthContext carries the credentials for AuthManagerApiClient.
+	AuthManagerAuthContext context.Context
 }
 
 // NewProviderConfig builds the Airflow API client and auth context from the
@@ -45,22 +47,28 @@ func NewProviderConfig(endpoint, oauth2Token, username, password string, disable
 		return ProviderConfig{}, fmt.Errorf("invalid base_endpoint: %w", err)
 	}
 
-	ctx := context.Background()
-
-	if oauth2Token != "" {
-		ctx = context.WithValue(ctx, airflow.ContextAccessToken, oauth2Token)
+	if username != "" && password == "" {
+		return ProviderConfig{}, fmt.Errorf("found username for basic auth, but password not specified")
 	}
 
-	if username != "" {
-		if password == "" {
-			return ProviderConfig{}, fmt.Errorf("found username for basic auth, but password not specified")
-		}
-		log.Printf("[DEBUG] Using API Basic Auth")
+	tokenCtx := context.WithValue(context.Background(), airflow.ContextAccessToken, oauth2Token)
+	basicCtx := context.WithValue(context.Background(), airflow.ContextBasicAuth, airflow.BasicAuth{
+		UserName: username,
+		Password: password,
+	})
 
-		ctx = context.WithValue(ctx, airflow.ContextBasicAuth, airflow.BasicAuth{
-			UserName: username,
-			Password: password,
-		})
+	// Only one Authorization header can be sent, so each API gets a single
+	// credential. The core API prefers the token; the auth manager API (FAB)
+	// prefers basic auth, as FAB does not accept Airflow 3 JWT tokens.
+	ctx, authManagerCtx := context.Background(), context.Background()
+	switch {
+	case oauth2Token != "" && username != "":
+		ctx, authManagerCtx = tokenCtx, basicCtx
+	case oauth2Token != "":
+		ctx, authManagerCtx = tokenCtx, tokenCtx
+	case username != "":
+		log.Printf("[DEBUG] Using API Basic Auth")
+		ctx, authManagerCtx = basicCtx, basicCtx
 	}
 
 	path := strings.TrimSuffix(u.Path, "/")
@@ -100,8 +108,9 @@ func NewProviderConfig(endpoint, oauth2Token, username, password string, disable
 	}
 
 	return ProviderConfig{
-		ApiClient:            apiClient,
-		AuthManagerApiClient: authManagerClient,
-		AuthContext:          ctx,
+		ApiClient:              apiClient,
+		AuthManagerApiClient:   authManagerClient,
+		AuthContext:            ctx,
+		AuthManagerAuthContext: authManagerCtx,
 	}, nil
 }

@@ -119,7 +119,7 @@ func (r *roleResource) Create(ctx context.Context, req resource.CreateRequest, r
 		Actions: expandRoleActions(plan.Actions),
 	}
 
-	_, httpResp, err := r.config.AuthManagerApiClient.RoleApi.PostRole(r.config.AuthContext).Role(role).Execute()
+	_, httpResp, err := r.config.AuthManagerApiClient.RoleApi.PostRole(r.config.AuthManagerAuthContext).Role(role).Execute()
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create Airflow role", clientError("create", name, httpResp, err))
 		return
@@ -163,7 +163,7 @@ func (r *roleResource) Update(ctx context.Context, req resource.UpdateRequest, r
 		Actions: expandRoleActions(plan.Actions),
 	}
 
-	_, httpResp, err := r.config.AuthManagerApiClient.RoleApi.PatchRole(r.config.AuthContext, name).Role(role).Execute()
+	_, httpResp, err := r.config.AuthManagerApiClient.RoleApi.PatchRole(r.config.AuthManagerAuthContext, name).Role(role).Execute()
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to update Airflow role", clientError("update", name, httpResp, err))
 		return
@@ -180,7 +180,7 @@ func (r *roleResource) Delete(ctx context.Context, req resource.DeleteRequest, r
 	}
 
 	name := state.ID.ValueString()
-	httpResp, err := r.config.AuthManagerApiClient.RoleApi.DeleteRole(r.config.AuthContext, name).Execute()
+	httpResp, err := r.config.AuthManagerApiClient.RoleApi.DeleteRole(r.config.AuthManagerAuthContext, name).Execute()
 	if err != nil {
 		if httpResp != nil && httpResp.StatusCode == http.StatusNotFound {
 			return
@@ -198,7 +198,7 @@ func (r *roleResource) ImportState(ctx context.Context, req resource.ImportState
 func (r *roleResource) readInto(m *roleResourceModel, diags *diag.Diagnostics) (found bool) {
 	id := m.ID.ValueString()
 
-	role, httpResp, err := r.config.AuthManagerApiClient.RoleApi.GetRole(r.config.AuthContext, id).Execute()
+	role, httpResp, err := r.config.AuthManagerApiClient.RoleApi.GetRole(r.config.AuthManagerAuthContext, id).Execute()
 	if httpResp != nil && httpResp.StatusCode == http.StatusNotFound {
 		return false
 	}
