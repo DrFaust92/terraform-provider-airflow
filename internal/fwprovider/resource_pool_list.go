@@ -3,7 +3,9 @@ package fwprovider
 import (
 	"context"
 	"fmt"
+	"net/http"
 
+	"github.com/apache/airflow-client-go/airflow"
 	"github.com/drfaust92/terraform-provider-airflow/internal/client"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/list"
@@ -48,7 +50,15 @@ func (r *poolListResource) Configure(_ context.Context, req resource.ConfigureRe
 }
 
 func (r *poolListResource) List(ctx context.Context, req list.ListRequest, stream *list.ListResultsStream) {
-	collection, httpResp, err := r.config.ApiClient.PoolApi.GetPools(r.config.AuthContext).Execute()
+	var httpResp *http.Response
+	items, err := fetchAllPages(func(limit, offset int32) ([]airflow.Pool, error) {
+		collection, resp, err := r.config.ApiClient.PoolApi.GetPools(r.config.AuthContext).Limit(limit).Offset(offset).Execute()
+		httpResp = resp
+		if err != nil {
+			return nil, err
+		}
+		return collection.GetPools(), nil
+	})
 	if err != nil {
 		var diags diag.Diagnostics
 		diags.AddError("Failed to list Airflow pools", clientError("list", "pools", httpResp, err))
@@ -56,7 +66,7 @@ func (r *poolListResource) List(ctx context.Context, req list.ListRequest, strea
 		return
 	}
 
-	pools := collection.GetPools()
+	pools := items
 	stream.Results = func(push func(list.ListResult) bool) {
 		for _, p := range pools {
 			result := req.NewListResult(ctx)

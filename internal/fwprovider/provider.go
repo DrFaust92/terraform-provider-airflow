@@ -170,6 +170,9 @@ func (p *airflowProvider) ListResources(_ context.Context) []func() list.ListRes
 		newVariableListResource,
 		newPoolListResource,
 		newConnectionListResource,
+		newRoleListResource,
+		newUserListResource,
+		newDagListResource,
 	}
 }
 

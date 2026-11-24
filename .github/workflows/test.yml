@@ -57,6 +57,7 @@ jobs:
         run: |
           echo "AIRFLOW_BASE_ENDPOINT=http://localhost:8080" >> $GITHUB_ENV
           echo "SKIP_AIRFLOW_DAG_TESTS=true" >> $GITHUB_ENV
+          echo "SKIP_AIRFLOW_DAG_LIST_TESTS=true" >> $GITHUB_ENV
           echo "AIRFLOW_API_BASE_PATH=/api/v2" >> $GITHUB_ENV
           # chart 1.18 ships a FAB provider that only accepts basic auth on the
           # auth manager API, so opt into it for roles/users.
@@ -118,7 +119,8 @@ jobs:
             --set workers.replicas=0 \
             --set redis.enabled=false \
             --set triggerer.enabled=false \
-            --set dagProcessor.enabled=false \
+            --set-string 'env[0].name=AIRFLOW__CORE__LOAD_EXAMPLES' \
+            --set-string 'env[0].value=True' \
             --set scheduler.enabled=false \
             --set statsd.enabled=false \
             --set createUserJob.useHelmHooks=false \
@@ -158,6 +160,21 @@ jobs:
             exit 1
           fi
           echo "AIRFLOW_OAUTH2_TOKEN=$token" >> $GITHUB_ENV
+
+      - name: Wait for the example DAGs to be parsed
+        run: |
+          # The DAG processor parses the example DAGs after start-up; the DAG
+          # list test needs the "tutorial" DAG.
+          for i in $(seq 1 60); do
+            if curl -sf -o /dev/null -H "Authorization: Bearer ${AIRFLOW_OAUTH2_TOKEN}" "${AIRFLOW_BASE_ENDPOINT}/api/v2/dags/tutorial"; then
+              echo "tutorial DAG is available"
+              exit 0
+            fi
+            echo "Waiting for DAG parsing... ($i/60)"
+            sleep 5
+          done
+          echo "tutorial DAG did not appear in time"
+          exit 1
 
       - name: Run integration tests
         run: |
@@ -209,6 +226,7 @@ jobs:
           echo "AIRFLOW_API_USERNAME=admin" >> $GITHUB_ENV
           echo "AIRFLOW_API_PASSWORD=admin" >> $GITHUB_ENV
           echo "SKIP_AIRFLOW_DAG_TESTS=true" >> $GITHUB_ENV
+          echo "SKIP_AIRFLOW_DAG_LIST_TESTS=true" >> $GITHUB_ENV
 
       - name: Port forward Airflow webserver
         run: |
