@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/apache/airflow-client-go/airflow"
 )
@@ -30,6 +31,10 @@ type ProviderConfig struct {
 	AuthManagerAuthContext context.Context
 }
 
+// httpTimeout bounds each API request so an unresponsive endpoint cannot hang
+// a plan or apply indefinitely.
+const httpTimeout = 2 * time.Minute
+
 // NewProviderConfig builds the Airflow API client and auth context from the
 // already-resolved provider configuration values.
 func NewProviderConfig(endpoint, oauth2Token, username, password string, disableSSL bool, basePath, sessionCookie, authManagerBasePath string, authManagerBasicAuth bool) (ProviderConfig, error) {
@@ -40,7 +45,7 @@ func NewProviderConfig(endpoint, oauth2Token, username, password string, disable
 		}
 	}
 
-	httpClient := &http.Client{Transport: transport}
+	httpClient := &http.Client{Transport: transport, Timeout: httpTimeout}
 
 	u, err := url.Parse(endpoint)
 	if err != nil {
