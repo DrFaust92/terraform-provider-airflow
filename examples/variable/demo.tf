@@ -1,7 +1,7 @@
 terraform {
   required_providers {
     airflow = {
-      source  = "drfaust92/airflow"
+      source = "drfaust92/airflow"
     }
   }
 }
