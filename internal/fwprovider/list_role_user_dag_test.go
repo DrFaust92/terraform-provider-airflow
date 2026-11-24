@@ -84,8 +84,10 @@ list "airflow_user" "test" {
 }
 
 func TestAccAirflowDag_list(t *testing.T) {
-	if os.Getenv("SKIP_AIRFLOW_DAG_TESTS") == "true" {
-		t.Skip("Skipping Airflow DAG tests")
+	// Separate from SKIP_AIRFLOW_DAG_TESTS: needs only a parsed "tutorial"
+	// example DAG, which the Airflow 3.2 CI job provides.
+	if os.Getenv("SKIP_AIRFLOW_DAG_LIST_TESTS") == "true" {
+		t.Skip("Skipping Airflow DAG list tests (SKIP_AIRFLOW_DAG_LIST_TESTS)")
 	}
 
 	resource.Test(t, resource.TestCase{
