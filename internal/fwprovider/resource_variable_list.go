@@ -3,7 +3,9 @@ package fwprovider
 import (
 	"context"
 	"fmt"
+	"net/http"
 
+	"github.com/apache/airflow-client-go/airflow"
 	"github.com/drfaust92/terraform-provider-airflow/internal/client"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/list"
@@ -49,7 +51,15 @@ func (r *variableListResource) Configure(_ context.Context, req resource.Configu
 }
 
 func (r *variableListResource) List(ctx context.Context, req list.ListRequest, stream *list.ListResultsStream) {
-	collection, httpResp, err := r.config.ApiClient.VariableApi.GetVariables(r.config.AuthContext).Execute()
+	var httpResp *http.Response
+	items, err := fetchAllPages(func(limit, offset int32) ([]airflow.VariableCollectionItem, error) {
+		collection, resp, err := r.config.ApiClient.VariableApi.GetVariables(r.config.AuthContext).Limit(limit).Offset(offset).Execute()
+		httpResp = resp
+		if err != nil {
+			return nil, err
+		}
+		return collection.GetVariables(), nil
+	})
 	if err != nil {
 		var diags diag.Diagnostics
 		diags.AddError("Failed to list Airflow variables", clientError("list", "variables", httpResp, err))
@@ -57,7 +67,7 @@ func (r *variableListResource) List(ctx context.Context, req list.ListRequest, s
 		return
 	}
 
-	variables := collection.GetVariables()
+	variables := items
 	stream.Results = func(push func(list.ListResult) bool) {
 		for _, v := range variables {
 			result := req.NewListResult(ctx)
