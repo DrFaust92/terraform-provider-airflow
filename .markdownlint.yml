@@ -16,3 +16,7 @@ MD022: false
 # Multiple blank lines: list-resource pages with an empty config schema render
 # consecutive blank lines in the generated output.
 MD012: false
+# Duplicate headings: tfplugindocs repeats "Required"/"Optional" under
+# separate sections (schema, nested blocks, identity schema).
+MD024:
+  siblings_only: true
