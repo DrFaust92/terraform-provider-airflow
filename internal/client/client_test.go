@@ -8,7 +8,7 @@ import (
 
 func TestNewProviderConfig_authManagerBasePath(t *testing.T) {
 	t.Run("unset reuses the core client", func(t *testing.T) {
-		cfg, err := NewProviderConfig("https://airflow.example.com", "token", "", "", false, "/api/v1", "", "", false)
+		cfg, err := NewProviderConfig("https://airflow.example.com", "token", "", "", false, "/api/v1", "", "", false, HTTPOptions{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -18,7 +18,7 @@ func TestNewProviderConfig_authManagerBasePath(t *testing.T) {
 	})
 
 	t.Run("unset defaults to FAB on api v2", func(t *testing.T) {
-		cfg, err := NewProviderConfig("https://airflow.example.com", "token", "", "", false, "/api/v2", "", "", false)
+		cfg, err := NewProviderConfig("https://airflow.example.com", "token", "", "", false, "/api/v2", "", "", false, HTTPOptions{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -28,7 +28,7 @@ func TestNewProviderConfig_authManagerBasePath(t *testing.T) {
 	})
 
 	t.Run("set uses its own server URL", func(t *testing.T) {
-		cfg, err := NewProviderConfig("https://airflow.example.com/prefix/", "token", "", "", false, "/api/v2", "", "/auth/fab/v1", false)
+		cfg, err := NewProviderConfig("https://airflow.example.com/prefix/", "token", "", "", false, "/api/v2", "", "/auth/fab/v1", false, HTTPOptions{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -42,7 +42,7 @@ func TestNewProviderConfig_authManagerBasePath(t *testing.T) {
 }
 
 func TestNewProviderConfig_authContextsTokenDefault(t *testing.T) {
-	cfg, err := NewProviderConfig("https://airflow.example.com", "token", "admin", "secret", false, "/api/v2", "", "", false)
+	cfg, err := NewProviderConfig("https://airflow.example.com", "token", "admin", "secret", false, "/api/v2", "", "", false, HTTPOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -57,7 +57,7 @@ func TestNewProviderConfig_authContextsTokenDefault(t *testing.T) {
 }
 
 func TestNewProviderConfig_authContextsBasicForAuthManager(t *testing.T) {
-	cfg, err := NewProviderConfig("https://airflow.example.com", "token", "admin", "secret", false, "/api/v2", "", "", true)
+	cfg, err := NewProviderConfig("https://airflow.example.com", "token", "admin", "secret", false, "/api/v2", "", "", true, HTTPOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -11,4 +11,4 @@ testacc:
 	TF_ACC=1 go test $(TEST) -parallel $(ACCTEST_PARALLELISM) -v $(TESTARGS) -timeout 5m
 
 test:
-	go test	
+	go test ./...	

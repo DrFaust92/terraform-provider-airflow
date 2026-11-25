@@ -196,6 +196,7 @@ func testAccProviderConfig() (client.ProviderConfig, error) {
 		os.Getenv("AIRFLOW_SESSION_COOKIE"),
 		os.Getenv("AIRFLOW_AUTH_MANAGER_BASE_PATH"),
 		os.Getenv("AIRFLOW_AUTH_MANAGER_BASIC_AUTH") == "true",
+		client.HTTPOptions{},
 	)
 }
 
