@@ -11,6 +11,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-testing/helper/acctest"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
+	"github.com/hashicorp/terraform-plugin-testing/tfversion"
 )
 
 func TestAccAirflowVariable_basic(t *testing.T) {
@@ -208,6 +209,8 @@ func TestAccAirflowVariable_valueWO(t *testing.T) {
 	resourceName := "airflow_variable.test"
 
 	resource.Test(t, resource.TestCase{
+		// Write-only attributes need Terraform 1.11.
+		TerraformVersionChecks:   []tfversion.TerraformVersionCheck{tfversion.SkipBelow(tfversion.Version1_11_0)},
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		CheckDestroy:             testAccCheckAirflowVariableCheckDestroy,
