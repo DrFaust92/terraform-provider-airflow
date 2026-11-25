@@ -4,16 +4,21 @@ package fwprovider
 
 import (
 	"context"
+	"crypto/x509"
+	"fmt"
 	"os"
 	"strconv"
+	"time"
 
 	"github.com/drfaust92/terraform-provider-airflow/internal/client"
+	"github.com/hashicorp/terraform-plugin-framework-validators/providervalidator"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/list"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	fwprovider "github.com/hashicorp/terraform-plugin-framework/provider"
 	"github.com/hashicorp/terraform-plugin-framework/provider/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
@@ -21,8 +26,9 @@ import (
 const defaultBasePath = "/api/v1"
 
 var (
-	_ fwprovider.Provider                  = &airflowProvider{}
-	_ fwprovider.ProviderWithListResources = &airflowProvider{}
+	_ fwprovider.Provider                     = &airflowProvider{}
+	_ fwprovider.ProviderWithListResources    = &airflowProvider{}
+	_ fwprovider.ProviderWithConfigValidators = &airflowProvider{}
 )
 
 type airflowProvider struct {
@@ -65,7 +71,7 @@ func (p *airflowProvider) Schema(_ context.Context, _ fwprovider.SchemaRequest, 
 			},
 			"disable_ssl_verification": schema.BoolAttribute{
 				Optional:    true,
-				Description: "Disable SSL verification",
+				Description: "Disable TLS certificate verification. Prefer `ca_certificate` for a server with a private CA.",
 			},
 			"base_path": schema.StringAttribute{
 				Optional:    true,
@@ -78,6 +84,26 @@ func (p *airflowProvider) Schema(_ context.Context, _ fwprovider.SchemaRequest, 
 			"auth_manager_basic_auth": schema.BoolAttribute{
 				Optional:    true,
 				Description: "Use `username`/`password` basic auth for the auth manager API even when `oauth2_token` is set. Needed for FAB provider releases before 3.2 (users) / 3.3 (roles), which do not accept the Airflow 3 token. Can also be set with `AIRFLOW_AUTH_MANAGER_BASIC_AUTH`.",
+			},
+			"ca_certificate": schema.StringAttribute{
+				Optional:    true,
+				Description: "PEM-encoded CA certificates used to verify the Airflow server certificate, instead of the system roots. Can also be set with the `AIRFLOW_CA_CERTIFICATE` environment variable.",
+				Validators:  []validator.String{pemCertificateValidator{}},
+			},
+			"client_certificate": schema.StringAttribute{
+				Optional:    true,
+				Description: "PEM-encoded client certificate, for an Airflow API (or a proxy in front of it) that requires TLS client authentication. Set it together with `client_key`, both in the configuration or both in environment variables. Can also be set with the `AIRFLOW_CLIENT_CERTIFICATE` environment variable.",
+				Validators:  []validator.String{pemCertificateValidator{}},
+			},
+			"client_key": schema.StringAttribute{
+				Optional:    true,
+				Sensitive:   true,
+				Description: "PEM-encoded private key of `client_certificate`. Can also be set with the `AIRFLOW_CLIENT_KEY` environment variable.",
+			},
+			"timeout": schema.StringAttribute{
+				Optional:    true,
+				Description: "Timeout of each API request, as a duration such as `30s` or `5m`. Can also be set with the `AIRFLOW_TIMEOUT` environment variable. Defaults to `2m`.",
+				Validators:  []validator.String{durationValidator{}},
 			},
 			"session_cookie": schema.StringAttribute{
 				Optional:    true,
@@ -98,6 +124,17 @@ type airflowProviderModel struct {
 	SessionCookie          types.String `tfsdk:"session_cookie"`
 	AuthManagerBasePath    types.String `tfsdk:"auth_manager_base_path"`
 	AuthManagerBasicAuth   types.Bool   `tfsdk:"auth_manager_basic_auth"`
+	CACertificate          types.String `tfsdk:"ca_certificate"`
+	ClientCertificate      types.String `tfsdk:"client_certificate"`
+	ClientKey              types.String `tfsdk:"client_key"`
+	Timeout                types.String `tfsdk:"timeout"`
+}
+
+// ConfigValidators checks the provider configuration at plan time.
+func (p *airflowProvider) ConfigValidators(context.Context) []fwprovider.ConfigValidator {
+	return []fwprovider.ConfigValidator{
+		providervalidator.RequiredTogether(path.MatchRoot("client_certificate"), path.MatchRoot("client_key")),
+	}
 }
 
 func (p *airflowProvider) Configure(_ context.Context, req fwprovider.ConfigureRequest, resp *fwprovider.ConfigureResponse) {
@@ -119,6 +156,20 @@ func (p *airflowProvider) Configure(_ context.Context, req fwprovider.ConfigureR
 	authManagerBasicAuth := boolOrEnv(config.AuthManagerBasicAuth, "AIRFLOW_AUTH_MANAGER_BASIC_AUTH")
 	disableSSL := config.DisableSSLVerification.ValueBool()
 
+	httpOpts := client.HTTPOptions{
+		CACertificate:     stringOrEnv(config.CACertificate, "AIRFLOW_CA_CERTIFICATE", ""),
+		ClientCertificate: stringOrEnv(config.ClientCertificate, "AIRFLOW_CLIENT_CERTIFICATE", ""),
+		ClientKey:         stringOrEnv(config.ClientKey, "AIRFLOW_CLIENT_KEY", ""),
+	}
+	if v := stringOrEnv(config.Timeout, "AIRFLOW_TIMEOUT", ""); v != "" {
+		d, err := time.ParseDuration(v)
+		if err != nil || d <= 0 {
+			resp.Diagnostics.AddAttributeError(path.Root("timeout"), "Invalid timeout", fmt.Sprintf("Expected a positive duration such as 30s or 5m, got %q.", v))
+			return
+		}
+		httpOpts.Timeout = d
+	}
+
 	if endpoint == "" {
 		resp.Diagnostics.AddAttributeError(
 			path.Root("base_endpoint"),
@@ -128,7 +179,7 @@ func (p *airflowProvider) Configure(_ context.Context, req fwprovider.ConfigureR
 		return
 	}
 
-	cfg, err := client.NewProviderConfig(endpoint, oauth2Token, username, password, disableSSL, basePath, sessionCookie, authManagerBasePath, authManagerBasicAuth)
+	cfg, err := client.NewProviderConfig(endpoint, oauth2Token, username, password, disableSSL, basePath, sessionCookie, authManagerBasePath, authManagerBasicAuth, httpOpts)
 	if err != nil {
 		resp.Diagnostics.AddError("Unable to configure Airflow API client", err.Error())
 		return
@@ -197,4 +248,44 @@ func stringOrEnv(v types.String, envKey, def string) string {
 		return env
 	}
 	return def
+}
+
+// pemCertificateValidator checks that a value contains a PEM-encoded certificate.
+type pemCertificateValidator struct{}
+
+func (pemCertificateValidator) Description(context.Context) string {
+	return "value must contain a PEM-encoded certificate"
+}
+
+func (v pemCertificateValidator) MarkdownDescription(ctx context.Context) string {
+	return v.Description(ctx)
+}
+
+func (pemCertificateValidator) ValidateString(_ context.Context, req validator.StringRequest, resp *validator.StringResponse) {
+	if req.ConfigValue.IsNull() || req.ConfigValue.IsUnknown() {
+		return
+	}
+	if !x509.NewCertPool().AppendCertsFromPEM([]byte(req.ConfigValue.ValueString())) {
+		resp.Diagnostics.AddAttributeError(req.Path, "Invalid PEM certificate", "The value does not contain a PEM-encoded certificate.")
+	}
+}
+
+// durationValidator checks that a value is a positive duration such as "30s".
+type durationValidator struct{}
+
+func (durationValidator) Description(context.Context) string {
+	return "value must be a positive duration such as 30s or 5m"
+}
+
+func (v durationValidator) MarkdownDescription(ctx context.Context) string {
+	return v.Description(ctx)
+}
+
+func (durationValidator) ValidateString(_ context.Context, req validator.StringRequest, resp *validator.StringResponse) {
+	if req.ConfigValue.IsNull() || req.ConfigValue.IsUnknown() {
+		return
+	}
+	if d, err := time.ParseDuration(req.ConfigValue.ValueString()); err != nil || d <= 0 {
+		resp.Diagnostics.AddAttributeError(req.Path, "Invalid duration", "Expected a positive duration such as 30s or 5m.")
+	}
 }

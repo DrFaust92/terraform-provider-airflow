@@ -90,7 +90,14 @@ jobs:
         run: |
           ACCTEST_PARALLELISM=3 make testacc
   testV3:
+    name: testV3 (Terraform ${{ matrix.terraform }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # The oldest supported Terraform (protocol 6) and the latest. Resource
+        # identity and list resource tests skip below 1.12 and 1.14.
+        terraform: ["1.0.11", "latest"]
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -177,6 +184,8 @@ jobs:
           exit 1
 
       - name: Run integration tests
+        env:
+          TF_ACC_TERRAFORM_VERSION: ${{ matrix.terraform != 'latest' && matrix.terraform || '' }}
         run: |
           ACCTEST_PARALLELISM=3 make testacc
   testV1:

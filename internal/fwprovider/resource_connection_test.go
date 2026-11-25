@@ -9,6 +9,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-testing/helper/acctest"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
+	"github.com/hashicorp/terraform-plugin-testing/tfversion"
 )
 
 func TestAccAirflowConnection_basic(t *testing.T) {
@@ -41,6 +42,8 @@ func TestAccAirflowConnection_passwordWO(t *testing.T) {
 
 	resourceName := "airflow_connection.test"
 	resource.Test(t, resource.TestCase{
+		// Write-only attributes need Terraform 1.11.
+		TerraformVersionChecks:   []tfversion.TerraformVersionCheck{tfversion.SkipBelow(tfversion.Version1_11_0)},
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		CheckDestroy:             testAccCheckAirflowConnectionCheckDestroy,
@@ -227,6 +230,8 @@ func TestAccAirflowConnection_extraWO(t *testing.T) {
 
 	resourceName := "airflow_connection.test"
 	resource.Test(t, resource.TestCase{
+		// Write-only attributes need Terraform 1.11.
+		TerraformVersionChecks:   []tfversion.TerraformVersionCheck{tfversion.SkipBelow(tfversion.Version1_11_0)},
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		CheckDestroy:             testAccCheckAirflowConnectionCheckDestroy,

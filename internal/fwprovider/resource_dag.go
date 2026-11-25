@@ -153,6 +153,9 @@ func (r *dagResource) Read(ctx context.Context, req resource.ReadRequest, resp *
 		return
 	}
 	if !found {
+		// Terraform before 1.12 sends no prior identity, and the framework
+		// rejects a read without one even when the resource is gone.
+		resp.Diagnostics.Append(resp.Identity.Set(ctx, dagIdentity(state.ID))...)
 		resp.State.RemoveResource(ctx)
 		return
 	}

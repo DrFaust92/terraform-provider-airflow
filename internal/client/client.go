@@ -6,6 +6,8 @@ package client
 import (
 	"context"
 	"crypto/tls"
+	"crypto/x509"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -31,21 +33,64 @@ type ProviderConfig struct {
 	AuthManagerAuthContext context.Context
 }
 
-// httpTimeout bounds each API request so an unresponsive endpoint cannot hang
-// a plan or apply indefinitely.
-const httpTimeout = 2 * time.Minute
+// DefaultTimeout bounds each API request so an unresponsive endpoint cannot
+// hang a plan or apply indefinitely.
+const DefaultTimeout = 2 * time.Minute
+
+// HTTPOptions configures the HTTP client. The zero value uses the defaults.
+type HTTPOptions struct {
+	// Timeout of each request; DefaultTimeout when zero.
+	Timeout time.Duration
+	// CACertificate is PEM; when set it replaces the system roots.
+	CACertificate string
+	// ClientCertificate and ClientKey are a PEM key pair for TLS client
+	// authentication; set both or neither.
+	ClientCertificate string
+	ClientKey         string
+}
+
+// newHTTPClient returns the client for the Airflow API. It starts from a
+// clone of http.DefaultTransport, so HTTPS_PROXY, HTTP_PROXY and NO_PROXY are
+// honoured with every TLS setting.
+func newHTTPClient(disableSSL bool, opts HTTPOptions) (*http.Client, error) {
+	tlsConfig := &tls.Config{MinVersion: tls.VersionTLS12, InsecureSkipVerify: disableSSL} //nolint:gosec // opt-in via disable_ssl_verification
+
+	if opts.CACertificate != "" {
+		pool := x509.NewCertPool()
+		if !pool.AppendCertsFromPEM([]byte(opts.CACertificate)) {
+			return nil, errors.New("ca_certificate: no PEM-encoded certificate found")
+		}
+		tlsConfig.RootCAs = pool
+	}
+
+	if (opts.ClientCertificate == "") != (opts.ClientKey == "") {
+		return nil, errors.New("client_certificate and client_key must be set together")
+	}
+	if opts.ClientCertificate != "" {
+		pair, err := tls.X509KeyPair([]byte(opts.ClientCertificate), []byte(opts.ClientKey))
+		if err != nil {
+			return nil, fmt.Errorf("client_certificate and client_key: %w", err)
+		}
+		tlsConfig.Certificates = []tls.Certificate{pair}
+	}
+
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.TLSClientConfig = tlsConfig
+
+	timeout := opts.Timeout
+	if timeout <= 0 {
+		timeout = DefaultTimeout
+	}
+	return &http.Client{Transport: transport, Timeout: timeout}, nil
+}
 
 // NewProviderConfig builds the Airflow API client and auth context from the
 // already-resolved provider configuration values.
-func NewProviderConfig(endpoint, oauth2Token, username, password string, disableSSL bool, basePath, sessionCookie, authManagerBasePath string, authManagerBasicAuth bool) (ProviderConfig, error) {
-	transport := http.DefaultTransport
-	if disableSSL {
-		transport = &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-		}
+func NewProviderConfig(endpoint, oauth2Token, username, password string, disableSSL bool, basePath, sessionCookie, authManagerBasePath string, authManagerBasicAuth bool, httpOpts HTTPOptions) (ProviderConfig, error) {
+	httpClient, err := newHTTPClient(disableSSL, httpOpts)
+	if err != nil {
+		return ProviderConfig{}, err
 	}
-
-	httpClient := &http.Client{Transport: transport, Timeout: httpTimeout}
 
 	u, err := url.Parse(endpoint)
 	if err != nil {

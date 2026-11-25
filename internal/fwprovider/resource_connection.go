@@ -264,6 +264,9 @@ func (r *connectionResource) Read(ctx context.Context, req resource.ReadRequest,
 		return
 	}
 	if !found {
+		// Terraform before 1.12 sends no prior identity, and the framework
+		// rejects a read without one even when the resource is gone.
+		resp.Diagnostics.Append(resp.Identity.Set(ctx, connectionIdentityModel{ID: state.ID})...)
 		resp.State.RemoveResource(ctx)
 		return
 	}
@@ -348,6 +351,9 @@ func (r *connectionResource) Update(ctx context.Context, req resource.UpdateRequ
 	if found := r.readInto(&plan, &resp.Diagnostics); resp.Diagnostics.HasError() {
 		return
 	} else if !found {
+		// Terraform before 1.12 sends no prior identity, and the framework
+		// rejects a read without one even when the resource is gone.
+		resp.Diagnostics.Append(resp.Identity.Set(ctx, connectionIdentityModel{ID: plan.ID})...)
 		resp.State.RemoveResource(ctx)
 		return
 	}

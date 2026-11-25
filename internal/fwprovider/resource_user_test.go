@@ -127,6 +127,8 @@ func TestAccAirflowUser_passwordWO(t *testing.T) {
 	resourceName := "airflow_user.test"
 
 	resource.Test(t, resource.TestCase{
+		// Write-only attributes need Terraform 1.11.
+		TerraformVersionChecks:   []tfversion.TerraformVersionCheck{tfversion.SkipBelow(tfversion.Version1_11_0)},
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		CheckDestroy:             testAccCheckAirflowUserCheckDestroy,

@@ -150,10 +150,14 @@ provider "airflow" {
 - `auth_manager_basic_auth` (Boolean) Use `username`/`password` basic auth for the auth manager API even when `oauth2_token` is set. Needed for FAB provider releases before 3.2 (users) / 3.3 (roles), which do not accept the Airflow 3 token. Can also be set with `AIRFLOW_AUTH_MANAGER_BASIC_AUTH`.
 - `base_endpoint` (String)
 - `base_path` (String) Base path for Airflow API endpoints
-- `disable_ssl_verification` (Boolean) Disable SSL verification
+- `ca_certificate` (String) PEM-encoded CA certificates used to verify the Airflow server certificate, instead of the system roots. Can also be set with the `AIRFLOW_CA_CERTIFICATE` environment variable.
+- `client_certificate` (String) PEM-encoded client certificate, for an Airflow API (or a proxy in front of it) that requires TLS client authentication. Set it together with `client_key`, both in the configuration or both in environment variables. Can also be set with the `AIRFLOW_CLIENT_CERTIFICATE` environment variable.
+- `client_key` (String, Sensitive) PEM-encoded private key of `client_certificate`. Can also be set with the `AIRFLOW_CLIENT_KEY` environment variable.
+- `disable_ssl_verification` (Boolean) Disable TLS certificate verification. Prefer `ca_certificate` for a server with a private CA.
 - `oauth2_token` (String, Sensitive) The oauth to use for API authentication
 - `password` (String, Sensitive) The password to use for API basic authentication
 - `session_cookie` (String, Sensitive) A session cookie value to use for authentication (sent as Cookie: session={value}). Useful for AWS MWAA private environments.
+- `timeout` (String) Timeout of each API request, as a duration such as `30s` or `5m`. Can also be set with the `AIRFLOW_TIMEOUT` environment variable. Defaults to `2m`.
 - `username` (String) The username to use for API basic authentication
 
 ## Running Acceptence Tests
